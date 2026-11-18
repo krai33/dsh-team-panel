@@ -92,6 +92,10 @@ export function AvatarSeat({ sessionId, t }: AvatarSeatProps) {
           style={position ?? { visibility: 'hidden', left: 0, top: 0 }}
           role="menu"
           data-avatar-menu
+          // The dismissal hook closes on outside pointerdown; menu-internal
+          // pointerdowns must not count (portal places the menu outside the
+          // seat root, so React's own capture never reaches it first).
+          onPointerDown={(event) => { event.stopPropagation() }}
           onClick={(event) => { event.stopPropagation() }}
         >
           {error !== null && (
