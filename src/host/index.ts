@@ -18,7 +18,7 @@
  * written atomically (tmp + rename) and cached in memory between writes.
  */
 
-import { readFile, rename, writeFile } from 'node:fs/promises'
+import { readFile, rename, writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { basename, dirname, join } from 'node:path'
@@ -34,6 +34,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'teamPanel/unknown-asset': { readonly asset: string }
     /** Reading or writing the mapping file failed. */
     'teamPanel/storage-error': { readonly message: string }
+    /** Uploaded image content exceeds the size limit. */
+    'teamPanel/asset-too-large': { readonly bytes: number; readonly maxBytes: number }
   }
 }
 
@@ -56,7 +58,25 @@ export interface AvatarAssignRequest {
   asset: string
 }
 
+/** Request body of `upload`: one browser-picked image file. */
+export interface AvatarUploadRequest {
+  /** Desired file name below `data/assets/`; sanitized server-side. */
+  name: string
+  /** Image bytes, base64-encoded. */
+  data: string
+}
+
+/** Response of `upload`. */
+export interface AvatarUploadValue {
+  /** The stored file name (sanitized; may differ from the request). */
+  asset: string
+  /** Whether an existing file with that name was overwritten. */
+  overwritten: boolean
+}
+
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'])
+/** Upload size cap: avatars render at ~22px; generous for any real image. */
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 
 function nonEmpty(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
@@ -173,6 +193,66 @@ export class TeamPanelAvatarService extends TypertRemoteService {
       )
     }
     return { assignments: current }
+  }
+
+  /**
+   * Store one uploaded image into `data/assets/` and refresh the asset list.
+   *
+   * The name is sanitized to its basename, forced lowercase extension from
+   * the allowlist, and given a short random suffix when it would overwrite
+   * an existing different file — the asset route caches by file name, so
+   * content changes must change names to reach the browser.
+   * @param request - desired file name and base64 image bytes.
+   * @returns the stored file name and whether an existing name was replaced.
+   */
+  @Remote('upload')
+  async upload(request: AvatarUploadRequest): Promise<AvatarUploadValue> {
+    if (!nonEmpty(request?.name) || typeof request?.data !== 'string' || request.data.length === 0) {
+      throw new RemoteError(
+        'teamPanel/invalid-request',
+        'upload requires name and data (base64 image) as non-empty strings',
+        {},
+      )
+    }
+    if (!isImageFile(request.name)) {
+      throw new RemoteError(
+        'teamPanel/invalid-request',
+        `upload name "${request.name}" must end with one of: ${[...IMAGE_EXTENSIONS].join(' ')}`,
+        {},
+      )
+    }
+    let bytes: Buffer
+    try {
+      bytes = Buffer.from(request.data, 'base64')
+    } catch {
+      throw new RemoteError('teamPanel/invalid-request', 'upload data is not valid base64', {})
+    }
+    if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) {
+      throw new RemoteError(
+        'teamPanel/asset-too-large',
+        `upload decoded to ${bytes.length} bytes; limit is ${MAX_UPLOAD_BYTES}`,
+        { bytes: bytes.length, maxBytes: MAX_UPLOAD_BYTES },
+      )
+    }
+    const assetsDir = join(this.dataDir, 'assets')
+    await mkdir(assetsDir, { recursive: true })
+    let stored = basename(request.name).replace(/[^\w.-]+/g, '_')
+    let overwritten = false
+    if (existsSync(join(assetsDir, stored))) {
+      overwritten = true
+      const dot = stored.lastIndexOf('.')
+      stored = `${stored.slice(0, dot)}-${Math.random().toString(36).slice(2, 6)}${stored.slice(dot)}`
+    }
+    try {
+      await writeFile(join(assetsDir, stored), bytes)
+    } catch (error) {
+      throw new RemoteError(
+        'teamPanel/storage-error',
+        `writing ${stored} failed: ${String(error)}`,
+        { message: String(error) },
+      )
+    }
+    return { asset: stored, overwritten }
   }
 }
 

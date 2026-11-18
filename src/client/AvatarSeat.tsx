@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { IconUserOutlineRegular, StateDot, useAnchoredPosition, useDismissOnOutsidePointer }
+import { IconUserOutlineRegular, IconPlusOutlineRegular, StateDot, useAnchoredPosition, useDismissOnOutsidePointer }
   from '@deepseek-ai/dsh-client-ui-primitives'
-import { assignAvatar, AvatarAssignError, getSnapshot, loadAvatars, subscribe } from './avatars.ts'
+import { assignAvatar, AvatarAssignError, getSnapshot, loadAvatars, subscribe, uploadAvatar } from './avatars.ts'
 import { NS, type TeamKey } from './locales.ts'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './styles.ts'
@@ -27,8 +27,10 @@ export function AvatarSeat({ sessionId, t }: AvatarSeatProps) {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const rootRef = useRef<HTMLSpanElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const position = useAnchoredPosition({ open, anchorRef: rootRef, panelRef, gap: 6, margin: 12 })
 
   useEffect(() => { loadAvatars() }, [])
@@ -59,6 +61,21 @@ export function AvatarSeat({ sessionId, t }: AvatarSeatProps) {
       setOpen(false)
     } catch (reason) {
       setError(reason instanceof AvatarAssignError ? reason.message : String(reason))
+    }
+  }
+
+  const onPickFile = async (picked: File | undefined): Promise<void> => {
+    if (picked === undefined) return
+    setUploading(true)
+    setError(null)
+    try {
+      const stored = await uploadAvatar(picked)
+      await assignAvatar(sessionId, stored)
+      setOpen(false)
+    } catch (reason) {
+      setError(reason instanceof AvatarAssignError ? reason.message : String(reason))
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -125,6 +142,21 @@ export function AvatarSeat({ sessionId, t }: AvatarSeatProps) {
               <span className={css.avatarName}>{asset}</span>
             </button>
           ))}
+          <label className={css.avatarUpload}>
+            <IconPlusOutlineRegular size={12} />
+            <span>{uploading ? t('avatar.uploading') : t('avatar.upload')}</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              className={css.avatarUploadInput}
+              disabled={uploading}
+              onChange={(event) => {
+                void onPickFile(event.target.files?.[0])
+                event.target.value = ''
+              }}
+            />
+          </label>
           {file !== undefined && (
             <button
               type="button"

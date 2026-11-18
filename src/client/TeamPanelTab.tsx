@@ -1,10 +1,10 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SubagentCatalogEntry } from '@deepseek-ai/dsh-subagent/types'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import { StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconPlusOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { assignAvatar, AvatarAssignError, getSnapshot, loadAvatars, subscribe } from './avatars.ts'
+import { assignAvatar, AvatarAssignError, getSnapshot, loadAvatars, subscribe, uploadAvatar } from './avatars.ts'
 import { NS } from './locales.ts'
 import css from './styles.ts'
 
@@ -57,6 +57,8 @@ function MemberRow({
 export function TeamPanelTab({ useSessions, t }: TeamPanelTabProps) {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({})
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadAvatars() }, [])
 
@@ -83,9 +85,37 @@ export function TeamPanelTab({ useSessions, t }: TeamPanelTabProps) {
       })
   }
 
+  const onUpload = (picked: File | undefined): void => {
+    if (picked === undefined) return
+    setUploading(true)
+    void uploadAvatar(picked)
+      .catch((reason: unknown) => {
+        setErrors(current => ({ ...current, __upload: reason instanceof AvatarAssignError ? reason.message : String(reason) }))
+      })
+      .finally(() => { setUploading(false) })
+  }
+
   return (
     <div className={css.settingsTab}>
       <p className={css.settingsHint}>{t('settings.hint')}</p>
+      <label className={css.avatarUpload}>
+        <IconPlusOutlineRegular size={12} />
+        <span>{uploading ? t('avatar.uploading') : t('avatar.upload')}</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+          className={css.avatarUploadInput}
+          disabled={uploading}
+          onChange={(event) => {
+            onUpload(event.target.files?.[0])
+            event.target.value = ''
+          }}
+        />
+      </label>
+      {errors.__upload !== undefined && errors.__upload !== '' && (
+        <span className={css.settingsError} role="alert">{errors.__upload}</span>
+      )}
       {state.assets.length === 0 && (
         <div className={css.notice} role="status">
           <StateDot state={state.loaded ? 'warning' : 'ongoing'} />

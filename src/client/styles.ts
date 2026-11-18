@@ -61,6 +61,9 @@ const stylesheet = `.tp-root{position:relative}
 .tp-avatarName{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .tp-avatarClear{width:100%;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);font-size:11px;text-align:left;cursor:pointer}
 .tp-avatarClear:focus-visible,.tp-avatarClear:hover{color:var(--dsw-alias-label-primary)}
+.tp-avatarUpload{display:flex;align-items:center;gap:6px;margin-top:4px;padding:6px 8px;border-top:1px solid var(--dsw-alias-border-l2);border-radius:0 0 6px 6px;color:var(--dsw-alias-label-secondary);font-size:11px;cursor:pointer}
+.tp-avatarUpload:focus-within,.tp-avatarUpload:hover{color:var(--dsw-alias-label-primary)}
+.tp-avatarUploadInput{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tp-settingsTab{display:flex;flex-direction:column;gap:8px}
 .tp-settingsHint{margin:0 0 4px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
 .tp-settingsRow{display:flex;align-items:center;gap:10px;min-width:0;padding:2px 0}
@@ -107,6 +110,8 @@ const classNames = {
   avatarThumb: 'tp-avatarThumb',
   avatarName: 'tp-avatarName',
   avatarClear: 'tp-avatarClear',
+  avatarUpload: 'tp-avatarUpload',
+  avatarUploadInput: 'tp-avatarUploadInput',
   settingsTab: 'tp-settingsTab',
   settingsHint: 'tp-settingsHint',
   settingsRow: 'tp-settingsRow',

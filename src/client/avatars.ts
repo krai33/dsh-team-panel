@@ -104,6 +104,36 @@ export function getSnapshot(): AvatarSnapshot {
 }
 
 /**
+ * Upload one browser-picked image into the host asset directory.
+ * @param file - the picked image file.
+ * @returns the stored asset name (sanitized server-side).
+ * @throws {AvatarAssignError} when the host rejects the upload.
+ */
+export async function uploadAvatar(file: File): Promise<string> {
+  const data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => { resolve(String(reader.result).split(',')[1] ?? '') }
+    reader.onerror = () => { reject(new AvatarAssignError('reading the file failed', 'read-error')) }
+    reader.readAsDataURL(file)
+  })
+  const value = await call<{ asset: string; overwritten: boolean }>('upload', {
+    request: { name: file.name, data },
+  })
+  // Refresh the asset list so pickers see the new file immediately.
+  await refreshAfterWrite()
+  return value.asset
+}
+
+/**
+ * Re-read the mapping after an external change (upload) without the
+ * in-flight dedup: bypasses `loadAvatars`'s early return.
+ */
+async function refreshAfterWrite(): Promise<void> {
+  const value = await call<{ assignments: Record<string, string>; assets: string[] }>('list', {})
+  publish({ assignments: value.assignments, assets: value.assets, loaded: true })
+}
+
+/**
  * Write one assignment (empty asset clears) and refresh the snapshot.
  * @param sessionId - member session id.
  * @param asset - asset file name, or '' to clear.
