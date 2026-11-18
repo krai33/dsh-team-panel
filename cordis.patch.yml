@@ -1,0 +1,6 @@
+# Community plugin bundle: contributes a browser Client face only; it does
+# not patch DSH source files. The Host half is an empty apply() so the loader
+# can mount the row that owns the client bundle.
+- insert:
+    - id: team-panel
+      name: dsh-team-panel

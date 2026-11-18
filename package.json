@@ -1,0 +1,52 @@
+{
+  "name": "dsh-team-panel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeepSeek Harness Web \u63d2\u4ef6\uff1a\u4f1a\u8bdd\u5934\u90e8 Agent team \u4e0b\u62c9\u9762\u677f\uff08\u6210\u5458\u82b1\u540d\u518c + \u5f53\u524d\u6a21\u578b + \u5171\u4eab\u4efb\u52a1\uff09\uff0c\u6570\u636e\u6765\u81ea stock \u6295\u5f71\uff0c\u4e0d\u4f9d\u8d56\u5b98\u65b9 experimental team \u63d2\u4ef6\u3002",
+  "type": "module",
+  "main": "./lib/host/index.js",
+  "types": "./lib/host/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/host/index.d.ts",
+      "default": "./lib/host/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/host/**/*.js",
+    "lib/host/**/*.d.ts",
+    "lib/client.js",
+    "lib/client.js.map",
+    "locale/*.json",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node node_modules-sibling/typescript/bin/tsc -p tsconfig.json && node scripts/typecheck-client.mjs && node node_modules-sibling/.bin/tsdown -c tsdown.client.config.ts",
+    "typecheck": "node scripts/typecheck-client.mjs"
+  },
+  "bin": {},
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.1.0"
+  },
+  "engines": {
+    "node": ">=24.9"
+  },
+  "license": "MIT"
+}
