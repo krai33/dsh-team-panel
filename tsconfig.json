@@ -8,10 +8,15 @@
     "declaration": true,
     "outDir": "lib",
     "rootDir": "src",
-    "types": [],
-    "paths": {
-      "@deepseek-ai/cordis": ["/home/xiwa/gitlab/dsh-subagent-model-switch/node_modules/@deepseek-ai/cordis/lib/types/index.d.ts"]
-    }
+    "types": [
+      "node"
+    ],
+    "typeRoots": [
+      "/home/xiwa/gitlab/dsh-subagent-model-switch/node_modules/@types"
+    ],
+    "baseUrl": "."
   },
-  "include": ["src/host/**/*.ts"]
+  "include": [
+    "src/host/**/*.ts"
+  ]
 }

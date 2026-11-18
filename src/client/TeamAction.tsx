@@ -13,6 +13,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { NS, type TeamKey } from './locales.ts'
+import { AvatarSeat } from './AvatarSeat.tsx'
 import css from './styles.ts'
 
 /** Business actions injected by the browser plugin. */
@@ -93,9 +94,9 @@ function TeamMemberRow({
         }}
       >
         <span className={css.memberDot}>
-          {status === 'inactive'
-            ? <IconUserOutlineRegular size={14} className={css.inactiveIcon} />
-            : <StateDot state={memberDotState(status)} />}
+          {status === 'running' || status === 'provisioning'
+            ? <StateDot state={memberDotState(status)} />
+            : <AvatarSeat sessionId={member.id} t={t} />}
         </span>
         <span className={css.memberText}>
           <span className={css.memberName}>

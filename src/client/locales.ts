@@ -22,6 +22,14 @@ export const zh = {
   'status.pending': '待处理',
   'status.in_progress': '进行中',
   'status.completed': '已完成',
+  'avatar.pick': '选择头像',
+  'avatar.image': '成员头像',
+  'avatar.loading': '正在加载头像…',
+  'avatar.none': '没有可选图片；把图片放入插件 data/assets/ 目录',
+  'avatar.clear': '恢复默认图标',
+  'settings.hint': '为团队成员预配头像：图片放在插件 data/assets/ 目录，这里选择后成员卡片即显示。',
+  'settings.noAssets': 'data/assets/ 目录还没有图片，放入后即在此可选。',
+  'settings.empty': '暂无成员；打开带子代理的会话后在此配置。',
 } satisfies Record<string, string>
 
 /** Team panel locale key union. */
@@ -46,4 +54,12 @@ export const en = {
   'status.pending': 'Pending',
   'status.in_progress': 'In progress',
   'status.completed': 'Completed',
+  'avatar.pick': 'Choose avatar',
+  'avatar.image': 'Member avatar',
+  'avatar.loading': 'Loading avatars…',
+  'avatar.none': 'No images available; drop files into the plugin data/assets/ directory',
+  'avatar.clear': 'Restore default icon',
+  'settings.hint': 'Pre-configure team member avatars: put images in the plugin data/assets/ directory, then pick one here and member cards display it.',
+  'settings.noAssets': 'No images in data/assets/ yet; drop files there to pick them here.',
+  'settings.empty': 'No members yet; open a session with subagents to configure them here.',
 } satisfies Record<TeamKey, string>

@@ -55,6 +55,17 @@ npm run build                        # host tsc + client typecheck 门禁 + tsdo
 | 模型显示 | 悬停成员卡片才出现 | 常驻显示 |
 | host 依赖 | dsh-experimental-agent-team 全家桶 | 无 |
 
+## 成员头像
+
+成员卡片左侧的图标可以点击：
+
+- **卡片上**：点击图标（未运行状态下显示）弹出图片选择菜单，选中立即生效；已分配时菜单里可“恢复默认图标”。运行中成员仍显示状态点（避免遮蔽 running 信号），停止后头像回归。
+- **插件设置面板**：设置 → 插件 → Team panel，每个 lead/成员一行下拉框，预先配置好映射（不必点开 team 面板）。
+- **添加图片**：把图片文件（png/jpg/jpeg/gif/webp/svg）放进本仓库 `data/assets/` 目录即可，无需改代码；映射存 `data/avatars.json`（sessionId → 文件名）。
+- 图片通过 client-modules 包资产路由下发（`/plugins/dsh-team-panel/assets/<file>`），浏览器带 cookie 访问。
+
+host 半边是一个 TypertRemoteService（`teamPanel` 命名空间，`list`/`assign` 两个方法），assign 校验文件存在 + 扩展名白名单 + `basename` 归一化，原子写盘。
+
 ## 已知限制
 
 - 只显示 lead 会话直接子代理（孙代不展开）。

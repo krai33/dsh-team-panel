@@ -5,8 +5,10 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { TeamAction, type TeamActionInjected } from './TeamAction.tsx'
+import { TeamPanelTab } from './TeamPanelTab.tsx'
 import { en, NS, zh, type TeamKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -16,7 +18,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Required browser services for navigation, slots, and localized copy. */
+/** Required browser services for navigation, slots, settings, and localized copy. */
 export const inject = ['sessions', 'uiWorkspace', 'slots', 'locale']
 
 /**
@@ -58,5 +60,16 @@ export function registerTeamPanelUi(ctx: ClientContext): void {
       locale: NS,
       inject: () => actions,
     }, TeamAction),
+  )
+
+  ctx.slots.inject(
+    'settings.plugins.tab',
+    () => ctx.slots.register({
+      name: 'settings.plugins.tab',
+      id: 'team-panel',
+      order: 40,
+      label: () => 'Team panel',
+      locale: NS,
+    }, TeamPanelTab),
   )
 }

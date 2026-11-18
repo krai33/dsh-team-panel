@@ -48,6 +48,25 @@ const stylesheet = `.tp-root{position:relative}
 .tp-meta>span{margin-right:10px}
 .tp-notice,.tp-error{display:flex;align-items:center;gap:6px;padding:9px;font-size:12px}
 .tp-error{color:var(--dsw-alias-state-error-primary)}
+.tp-avatarSeat{position:relative}
+.tp-avatarButton{display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}
+.tp-avatarButton:focus-visible{outline:2px solid var(--dsw-alias-border-l3);outline-offset:1px}
+.tp-avatarImage{display:block;width:22px;height:22px;border-radius:6px;object-fit:cover}
+.tp-avatarMenu{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);display:flex;flex-direction:column;position:fixed;z-index:110;box-sizing:border-box;min-width:200px;max-height:280px;padding:6px;overflow-y:auto;border-radius:10px;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter)}
+.tp-avatarOption{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}
+.tp-avatarOption:focus-visible{background:var(--dsw-alias-bg-layer-2)}
+@media (hover:hover){.tp-avatarOption:hover{background:var(--dsw-alias-bg-layer-2)}}
+.tp-avatarOptionActive{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent)}
+.tp-avatarThumb{display:block;width:20px;height:20px;border-radius:4px;object-fit:cover;flex:none}
+.tp-avatarName{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tp-avatarClear{width:100%;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);font-size:11px;text-align:left;cursor:pointer}
+.tp-avatarClear:focus-visible,.tp-avatarClear:hover{color:var(--dsw-alias-label-primary)}
+.tp-settingsTab{display:flex;flex-direction:column;gap:8px}
+.tp-settingsHint{margin:0 0 4px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
+.tp-settingsRow{display:flex;align-items:center;gap:10px;min-width:0;padding:2px 0}
+.tp-settingsLabel{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dsw-alias-label-primary);font-size:12px}
+.tp-settingsSelect{flex:0 1 200px;min-width:0;max-width:200px}
+.tp-settingsError{flex:none;color:var(--dsw-alias-state-error-primary);font-size:11px}
 `
 
 const classNames = {
@@ -79,6 +98,21 @@ const classNames = {
   meta: 'tp-meta',
   notice: 'tp-notice',
   error: 'tp-error',
+  avatarSeat: 'tp-avatarSeat',
+  avatarButton: 'tp-avatarButton',
+  avatarImage: 'tp-avatarImage',
+  avatarMenu: 'tp-avatarMenu',
+  avatarOption: 'tp-avatarOption',
+  avatarOptionActive: 'tp-avatarOptionActive',
+  avatarThumb: 'tp-avatarThumb',
+  avatarName: 'tp-avatarName',
+  avatarClear: 'tp-avatarClear',
+  settingsTab: 'tp-settingsTab',
+  settingsHint: 'tp-settingsHint',
+  settingsRow: 'tp-settingsRow',
+  settingsLabel: 'tp-settingsLabel',
+  settingsSelect: 'tp-settingsSelect',
+  settingsError: 'tp-settingsError',
 } as const
 
 const TAG_ID = 'dsh-team-panel/TeamAction.css'
