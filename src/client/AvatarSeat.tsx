@@ -82,7 +82,7 @@ export function AvatarSeat({ sessionId, t }: AvatarSeatProps) {
   return (
     <span
       ref={rootRef}
-      className={`${css.memberDot} ${css.avatarSeat}`}
+      className={css.avatarSeat}
       data-avatar-seat
     >
       <button

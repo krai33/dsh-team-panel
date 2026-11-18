@@ -45,10 +45,6 @@ function memberStatusKey(status: MemberStatus): TeamKey {
   }
 }
 
-function memberDotState(status: MemberStatus): StateDotState {
-  return status === 'running' ? 'ongoing' : status === 'provisioning' ? 'ongoing' : 'idle'
-}
-
 function taskDotState(task: TodoItem): StateDotState {
   switch (task.status) {
     case 'pending': return 'idle'
@@ -81,36 +77,43 @@ function TeamMemberRow({
 
   return (
     <Tooltip label={t('open')} side="bottom" gap={4} disabled={inert}>
-      <button
-        type="button"
+      <div
         className={highlightCurrent ? `${css.member} ${css.memberCurrent}` : css.member}
-        disabled={inert}
-        onClick={() => {
-          try {
-            openTeammate(sessionId, member.id)
-          } catch (reason) {
-            onError(String(reason))
-          }
-        }}
+        data-member-card
       >
         <span className={css.memberDot}>
-          {status === 'running' || status === 'provisioning'
-            ? <StateDot state={memberDotState(status)} />
-            : <AvatarSeat sessionId={member.id} t={t} />}
+          <AvatarSeat sessionId={member.id} t={t} />
+          {(status === 'running' || status === 'provisioning') && (
+            <span className={css.runningDot} data-running-dot aria-hidden="true" />
+          )}
         </span>
-        <span className={css.memberText}>
-          <span className={css.memberName}>
-            <span className={css.memberNameText}>{member.label ?? member.id}</span>
-            {isCurrent && <Tag tone="info" className={css.currentTag}>{t('current')}</Tag>}
+        <button
+          type="button"
+          className={css.memberOpen}
+          disabled={inert}
+          aria-label={t('open')}
+          onClick={() => {
+            try {
+              openTeammate(sessionId, member.id)
+            } catch (reason) {
+              onError(String(reason))
+            }
+          }}
+        >
+          <span className={css.memberText}>
+            <span className={css.memberName}>
+              <span className={css.memberNameText}>{member.label ?? member.id}</span>
+              {isCurrent && <Tag tone="info" className={css.currentTag}>{t('current')}</Tag>}
+            </span>
+            <small>
+              {t(memberStatusKey(status))}
+              {model !== undefined && (
+                <span className={css.memberModel}>{` · ${t('model')}: ${model}`}</span>
+              )}
+            </small>
           </span>
-          <small>
-            {t(memberStatusKey(status))}
-            {model !== undefined && (
-              <span className={css.memberModel}>{` · ${t('model')}: ${model}`}</span>
-            )}
-          </small>
-        </span>
-      </button>
+        </button>
+      </div>
     </Tooltip>
   )
 }
