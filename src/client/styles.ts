@@ -28,7 +28,7 @@ const stylesheet = `.tp-root{position:relative}
 .tp-member:focus-within{--dsw-elevation-stroke-color:var(--dsw-alias-border-l3);box-shadow:var(--dsw-elevation-panel)}
 @media (hover:hover){.tp-member:hover{--dsw-elevation-stroke-color:var(--dsw-alias-border-l3);box-shadow:var(--dsw-elevation-panel)}}
 .tp-memberDot{display:inline-flex;align-items:center;flex:none;position:relative}
-.tp-runningDot{position:absolute;right:-4px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 2px var(--dsw-alias-bg-layer-2);animation:tp-breathe 1.8s ease-in-out infinite}
+.tp-runningDot{position:absolute;right:-2px;bottom:-1px;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 1.5px var(--dsw-alias-bg-layer-2);animation:tp-breathe 1.8s ease-in-out infinite}
 @keyframes tp-breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
 .tp-inactiveIcon{color:var(--dsw-alias-label-tertiary)}
 .tp-memberText{display:flex;flex-direction:column;min-width:0}
