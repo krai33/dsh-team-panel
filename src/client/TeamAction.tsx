@@ -81,7 +81,7 @@ function TeamMemberRow({
         className={highlightCurrent ? `${css.member} ${css.memberCurrent}` : css.member}
         data-member-card
       >
-        <span className={css.memberDot}>
+        <span className={css.memberDot} title={t(memberStatusKey(status))}>
           <AvatarSeat sessionId={member.id} t={t} />
           {(status === 'running' || status === 'provisioning') && (
             <span className={css.runningDot} data-running-dot aria-hidden="true" />
@@ -106,9 +106,8 @@ function TeamMemberRow({
               {isCurrent && <Tag tone="info" className={css.currentTag}>{t('current')}</Tag>}
             </span>
             <small className={css.memberStatusLine}>
-              {t(memberStatusKey(status))}
               {model !== undefined && (
-                <span className={css.memberModel}>{` · ${t('model')}: ${model}`}</span>
+                <span className={css.memberModel}>{`${t('model')}: ${model}`}</span>
               )}
             </small>
           </span>

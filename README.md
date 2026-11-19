@@ -6,7 +6,7 @@ DeepSeek Harness Web 客户端插件：把官方 experimental Agent Teams 的会
 
 - **成员花名册**：入口挂在会话头部（`conversation.session.header.actions`），悬停/点击展开。首行是主会话（lead），其后是 `subagentCatalog` 投影里的本地子代理（continuable/one-shot；external 不显示）。
 - **动态模型显示**：每个成员卡片常驻显示当前使用的模型（`modelSelection.next.model`，即 pending ?? lastUsed），不是悬停才出现。
-- **状态**：运行中 / 未运行 / 准备中（unknown 模式子代理），叠加实时 running 状态。
+- **状态**：运行中 / 未运行 / 准备中（unknown 模式子代理），叠加实时 running 状态。运行/准备中以头像角落呼吸绿点表达，文字状态（悬停头像可见）不再占用卡片正文；卡片第二行只显示当前模型。
 - **打开成员会话**：点击成员卡片跳转（当前会话与不可跳转的成员置灰）。
 - **任务板**：只读展示主会话 `todos` 投影（`todo_write` 工具维护的清单），三态状态点 + 展开收起。
 - **子会话模型选择**：打开 continuable 子会话后，在输入框底部使用与主会话相同的原生模型选择器（模型搜索、供应商分组、推理强度）。卡片只显示模型信息，不放切换按钮。子会话通过 `teamPanel/switchModel` 记录选择，下一步模型请求生效，不改变对话历史；已卸载的成员会显示错误，不会自动唤醒。主会话仍使用原生接口。
