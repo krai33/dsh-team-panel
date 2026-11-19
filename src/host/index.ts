@@ -47,6 +47,8 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     agents: import('@deepseek-ai/dsh-agent').AgentRegistry
     llm: import('@deepseek-ai/dsh-llm').LlmRuntime
+    workspaceRegistry: import('@deepseek-ai/dsh-workspace').WorkspaceRegistry
+    subagents: import('@deepseek-ai/dsh-subagent').SubagentRuntime
   }
 }
 
@@ -99,7 +101,7 @@ function isImageFile(name: string): boolean {
 }
 
 export class TeamPanelAvatarService extends TypertRemoteService {
-  static inject = ['typertGateway', 'agents', 'llm']
+  static inject = ['typertGateway', 'agents', 'llm', 'workspaceRegistry']
 
   private readonly dataDir: string
   private cache: AvatarMap | undefined
@@ -350,6 +352,28 @@ export class TeamPanelAvatarService extends TypertRemoteService {
       },
       ...(header === undefined ? {} : { lastUsed: { provider: header.provider, model: header.model } }),
     }
+  }
+
+  /**
+   * List the sessions removed from team rosters: the intersection of the
+   * lead's durable subagent catalog with the Workspace registry's global
+   * archive set. Removing a member archives its Session (with work stopped),
+   * so this is exactly the hidden-from-roster set.
+   * @param request - the lead session whose direct children are filtered.
+   * @returns child session ids currently archived.
+   */
+  @Remote('archivedChildren')
+  async archivedChildren(request: { sessionId: string }): Promise<{ archived: string[] }> {
+    if (!nonEmpty(request?.sessionId)) {
+      throw new RemoteError(
+        'teamPanel/invalid-request',
+        'archivedChildren requires a non-empty sessionId',
+        {},
+      )
+    }
+    const children = await this.ctx.subagents.listChildren(request.sessionId as never)
+    const archived = new Set(this.ctx.workspaceRegistry.archivedSessionIds)
+    return { archived: children.filter(child => archived.has(child.id)).map(child => child.id) }
   }
 }
 

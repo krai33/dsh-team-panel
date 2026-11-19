@@ -7,8 +7,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { TeamAction, type TeamActionInjected } from './TeamAction.tsx'
 import { TeamPanelTab } from './TeamPanelTab.tsx'
+import { TeamPanelPluginItem } from './TeamPanelPluginItem.tsx'
 import { registerComposerModel } from './composer-model.ts'
 import { en, NS, zh, type TeamKey } from './locales.ts'
 
@@ -73,5 +75,19 @@ export function registerTeamPanelUi(ctx: ClientContext): void {
       label: () => 'Team panel',
       locale: NS,
     }, TeamPanelTab),
+  )
+
+  // The Plugins page's Built-in plugin settings list reads `plugins.item`;
+  // register the same component there so both surfaces expose the restore list.
+  ctx.slots.inject(
+    'plugins.item',
+    () => ctx.slots.register({
+      name: 'plugins.item',
+      id: 'team-panel',
+      order: 60,
+      label: () => 'Team panel',
+      locale: NS,
+      inject: () => ({ view: 'page' as const }),
+    }, TeamPanelPluginItem),
   )
 }

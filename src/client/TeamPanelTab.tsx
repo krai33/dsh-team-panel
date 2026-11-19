@@ -5,6 +5,9 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import { IconPlusOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { assignAvatar, AvatarAssignError, getSnapshot, loadAvatars, subscribe, uploadAvatar } from './avatars.ts'
+import {
+  getRemovedSnapshot, loadRemoved, restoreMember, subscribeRemoved,
+} from './removed.ts'
 import { NS } from './locales.ts'
 import css from './styles.ts'
 
@@ -61,6 +64,9 @@ export function TeamPanelTab({ useSessions, t }: TeamPanelTabProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadAvatars() }, [])
+  const removedState = useSyncExternalStore(subscribeRemoved, getRemovedSnapshot, getRemovedSnapshot)
+  const [restoring, setRestoring] = useState<string | null>(null)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
 
   // One flattened roster view across every lead that has a catalog: rows for
   // the lead and each local child, labeled from the session list.
@@ -73,6 +79,30 @@ export function TeamPanelTab({ useSessions, t }: TeamPanelTabProps) {
     return map
   })
   const titles = useSessions(store => store.byId as Readonly<Record<string, { displayTitle?: string }>>)
+
+  const labelOf = (leadId: string, childId: string): string => {
+    const entry = catalogs.find(group => group.leadId === leadId)?.entries.find(row => row.id === childId)
+    return entry?.label ?? titles[childId]?.displayTitle ?? childId
+  }
+
+  const onRestore = (leadId: string, childId: string): void => {
+    if (restoring !== null) return
+    setRestoring(childId)
+    setRestoreError(null)
+    void restoreMember(leadId, childId)
+      .catch((reason: unknown) => { setRestoreError(reason instanceof Error ? reason.message : String(reason)) })
+      .finally(() => { setRestoring(null) })
+  }
+
+  const removedRows = catalogs.flatMap(({ leadId, entries }) =>
+    (removedState.byLead[leadId] ?? [])
+      .filter(childId => entries.some(entry => entry.id === childId))
+      .map(childId => ({ leadId, childId })))
+  useEffect(() => {
+    for (const { leadId } of catalogs) {
+      if (!(leadId in removedState.byLead) || !removedState.loaded) loadRemoved(leadId)
+    }
+  })
 
   const onChoose = (sessionId: string, asset: string): void => {
     void assignAvatar(sessionId, asset)
@@ -147,6 +177,28 @@ export function TeamPanelTab({ useSessions, t }: TeamPanelTabProps) {
           )),
       ])}
       {catalogs.length === 0 && <p className={css.emptyNotice}>{t('settings.empty')}</p>}
+      {removedRows.length > 0 && (
+        <div className={css.removedSection}>
+          <p className={css.settingsHint}>{t('settings.removed')}</p>
+          {restoreError !== null && <span className={css.settingsError} role="alert">{restoreError}</span>}
+          {removedRows.map(({ leadId, childId }) => (
+            <div key={childId} className={css.removedRow}>
+              <span className={css.removedLabel}>{labelOf(leadId, childId)}</span>
+              <button
+                type="button"
+                className={css.restoreButton}
+                disabled={restoring !== null}
+                onClick={() => { onRestore(leadId, childId) }}
+              >
+                {restoring === childId ? t('remove.pending') : t('settings.restore')}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {catalogs.length > 0 && removedRows.length === 0 && (
+        <p className={css.emptyNotice}>{t('settings.removedEmpty')}</p>
+      )}
     </div>
   )
 }

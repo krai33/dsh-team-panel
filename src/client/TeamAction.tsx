@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SubagentCatalogEntry } from '@deepseek-ai/dsh-subagent/types'
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  IconChevronDownOutlineRegular,
+  IconChevronDownOutlineRegular, IconCloseOutlineRegular,
   IconUserOutlineRegular, IconUsersOutlineRegular, StateDot, Tag, Tooltip,
   useAnchoredPosition, useDismissOnOutsidePointer, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -14,6 +14,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { NS, type TeamKey } from './locales.ts'
 import { AvatarSeat } from './AvatarSeat.tsx'
+import { getRemovedSnapshot, loadRemoved, removeMember, subscribeRemoved } from './removed.ts'
 import css from './styles.ts'
 
 /** Business actions injected by the browser plugin. */
@@ -117,6 +118,86 @@ function TeamMemberRow({
   )
 }
 
+/** Card plus its hover-gated remove control; the lead row has no remove. */
+function TeamChildRow(props: TeamMemberRowProps & { onRemoved: (message: string) => void }) {
+  const { member, t } = props
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const confirmPosition = useAnchoredPosition({
+    open: confirming, anchorRef, panelRef, gap: 6, margin: 12,
+  })
+
+  useEffect(() => {
+    if (!confirming) return
+    const dismiss = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setConfirming(false)
+    }
+    document.addEventListener('keydown', dismiss)
+    return () => { document.removeEventListener('keydown', dismiss) }
+  }, [confirming])
+
+  useDismissOnOutsidePointer(anchorRef, confirming, setConfirming, panelRef)
+
+  const confirmRemove = (): void => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    void removeMember(props.sessionId, member.id)
+      .catch((reason: unknown) => { setError(reason instanceof Error ? reason.message : String(reason)) })
+      .finally(() => setBusy(false))
+  }
+
+  return (
+    <div ref={anchorRef} className={css.memberRemoveWrap}>
+      <TeamMemberRow {...props} />
+      <button
+        type="button"
+        className={css.memberRemove}
+        aria-label={t('remove.aria')}
+        aria-haspopup="dialog"
+        aria-expanded={confirming}
+        disabled={busy}
+        onClick={(event) => {
+          event.stopPropagation()
+          setError(null)
+          setConfirming(current => !current)
+        }}
+      >
+        <IconCloseOutlineRegular size={11} />
+      </button>
+      {confirming && createPortal(
+        <div
+          ref={panelRef}
+          className={css.confirmCard}
+          style={confirmPosition ?? { visibility: 'hidden', left: 0, top: 0 }}
+          role="dialog"
+          aria-label={t('remove.confirmTitle')}
+          onPointerDown={(event) => { event.stopPropagation() }}
+          onClick={(event) => { event.stopPropagation() }}
+        >
+          <div className={css.confirmTitle}>{t('remove.confirmTitle')}</div>
+          <div className={css.confirmDesc}>{t('remove.confirmDesc', { name: member.label ?? member.id })}</div>
+          {error !== null && <div className={css.confirmError} role="alert">{error}</div>}
+          <div className={css.confirmActions}>
+            <button type="button" className={css.confirmCancel} disabled={busy} onClick={() => { setConfirming(false) }}>
+              {t('remove.cancel')}
+            </button>
+            <button type="button" className={css.confirmGo} disabled={busy} onClick={confirmRemove}>
+              {busy ? t('remove.pending') : t('remove.confirm')}
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
 /** Task card with a two-line description clamp expanded from a toggle in the meta row. */
 function TaskCard({ task, t }: { task: TodoItem; t: TranslateNS<typeof NS> }) {
   const [expanded, setExpanded] = useState(false)
@@ -183,6 +264,11 @@ export function TeamAction({
   const listing = useSessions(state => state.phase === 'pending')
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pinnedRef = useRef(false)
+  const removed = useSyncExternalStore(subscribeRemoved, getRemovedSnapshot, getRemovedSnapshot)
+
+  useEffect(() => { if (open) loadRemoved(leadSessionId) }, [open, leadSessionId])
+
+  const archivedChildren = new Set(removed.byLead[leadSessionId] ?? [])
 
   const members: SubagentCatalogEntry[] = [
     {
@@ -191,7 +277,7 @@ export function TeamAction({
       mode: 'continuable',
       label: useSessions(state => state.byId[leadSessionId]?.displayTitle) ?? leadSessionId,
     },
-    ...(catalog ?? []).filter(entry => entry.mode !== 'external'),
+    ...(catalog ?? []).filter(entry => entry.mode !== 'external' && !archivedChildren.has(entry.id)),
   ]
 
   const cancelHoverChange = (): void => {
@@ -325,7 +411,7 @@ export function TeamAction({
                   t={t}
                 />
                 {members.slice(1).map(member => (
-                  <TeamMemberRow
+                  <TeamChildRow
                     key={member.id}
                     member={member}
                     memberCount={members.length}
@@ -334,6 +420,7 @@ export function TeamAction({
                     useSessionStatus={useSessionStatus}
                     openTeammate={openTeammate}
                     onError={setError}
+                    onRemoved={setError}
                     t={t}
                   />
                 ))}

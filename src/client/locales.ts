@@ -32,6 +32,15 @@ export const zh = {
   'settings.hint': '为团队成员预配头像：点击“添加图片”上传，然后给每个成员选择一张。',
   'settings.noAssets': 'data/assets/ 目录还没有图片，放入后即在此可选。',
   'settings.empty': '暂无成员；打开带子代理的会话后在此配置。',
+  'settings.removed': '已移除的成员（归档会话，可恢复）',
+  'settings.removedEmpty': '没有已移除的成员。',
+  'settings.restore': '恢复',
+  'remove.aria': '从团队移除',
+  'remove.confirmTitle': '移除成员',
+  'remove.confirmDesc': '将停止“{name}”的运行并归档其会话；父会话不能再唤醒它，历史保留，可在插件设置中恢复。',
+  'remove.confirm': '停止并移除',
+  'remove.cancel': '取消',
+  'remove.pending': '正在移除…',
 } satisfies Record<string, string>
 
 /** Team panel locale key union. */
@@ -66,4 +75,13 @@ export const en = {
   'settings.hint': 'Pre-configure team member avatars: upload images with "Add image", then pick one per member.',
   'settings.noAssets': 'No images in data/assets/ yet; drop files there to pick them here.',
   'settings.empty': 'No members yet; open a session with subagents to configure them here.',
+  'settings.removed': 'Removed members (archived sessions; restorable)',
+  'settings.removedEmpty': 'No removed members.',
+  'settings.restore': 'Restore',
+  'remove.aria': 'Remove from team',
+  'remove.confirmTitle': 'Remove member',
+  'remove.confirmDesc': 'Stops "{name}" and archives its session; the parent can no longer wake it. History is kept and you can restore it in plugin settings.',
+  'remove.confirm': 'Stop and remove',
+  'remove.cancel': 'Cancel',
+  'remove.pending': 'Removing…',
 } satisfies Record<TeamKey, string>
