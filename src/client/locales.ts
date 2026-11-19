@@ -32,6 +32,10 @@ export const zh = {
   'settings.hint': '为团队成员预配头像：点击“添加图片”上传，然后给每个成员选择一张。',
   'settings.noAssets': 'data/assets/ 目录还没有图片，放入后即在此可选。',
   'settings.empty': '暂无成员；打开带子代理的会话后在此配置。',
+  'model.switch': '切换模型',
+  'model.loading': '正在加载模型列表…',
+  'model.none': '无可用模型',
+  'model.hint': '切换在成员下一步生效',
 } satisfies Record<string, string>
 
 /** Team panel locale key union. */
@@ -66,4 +70,8 @@ export const en = {
   'settings.hint': 'Pre-configure team member avatars: upload images with "Add image", then pick one per member.',
   'settings.noAssets': 'No images in data/assets/ yet; drop files there to pick them here.',
   'settings.empty': 'No members yet; open a session with subagents to configure them here.',
+  'model.switch': 'Switch model',
+  'model.loading': 'Loading models…',
+  'model.none': 'No models available',
+  'model.hint': 'Applies at the member\u2019s next step',
 } satisfies Record<TeamKey, string>

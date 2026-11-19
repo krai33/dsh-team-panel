@@ -74,6 +74,21 @@ const stylesheet = `.tp-root{position:relative}
 .tp-settingsLabel{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dsw-alias-label-primary);font-size:12px}
 .tp-settingsSelect{flex:0 1 200px;min-width:0;max-width:200px}
 .tp-settingsError{flex:none;color:var(--dsw-alias-state-error-primary);font-size:11px}
+.tp-modelSeat{position:relative;flex:none;margin-left:auto;align-self:center}
+.tp-modelButton{display:inline-flex;align-items:center;gap:3px;max-width:120px;padding:2px 6px;border:0;border-radius:5px;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary);font-size:10px;line-height:14px;cursor:pointer}
+.tp-modelButton:hover:not(:disabled),.tp-modelButton:focus-visible{color:var(--dsw-alias-label-primary)}
+.tp-modelButton:disabled{opacity:.6;cursor:default}
+.tp-modelButtonText{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tp-modelMenu{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);display:flex;flex-direction:column;position:fixed;z-index:110;box-sizing:border-box;min-width:220px;max-height:320px;padding:6px;overflow-y:auto;border-radius:10px;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter)}
+.tp-modelGroup{display:flex;flex-direction:column}
+.tp-modelGroupHead{display:inline-flex;align-items:center;gap:4px;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;font-weight:500;cursor:pointer}
+.tp-modelGroupHead:hover,.tp-modelGroupHead:focus-visible{background:var(--dsw-alias-bg-layer-2)}
+.tp-modelItemWrap{display:flex;flex-direction:column;padding-left:8px}
+.tp-modelItem,.tp-modelEffort{display:block;width:100%;padding:5px 10px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font-size:11px;text-align:left;cursor:pointer}
+.tp-modelItem:hover,.tp-modelItem:focus-visible,.tp-modelEffort:hover,.tp-modelEffort:focus-visible{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.tp-modelItemActive{color:var(--dsw-alias-state-business-primary)}
+.tp-modelEffort{padding-left:22px;font-size:10px;color:var(--dsw-alias-label-tertiary)}
+.tp-modelHint{margin-top:4px;padding:5px 8px 2px;border-top:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-caption);font-size:10px}
 `
 
 const classNames = {
@@ -95,6 +110,7 @@ const classNames = {
   memberName: 'tp-memberName',
   memberNameText: 'tp-memberNameText',
   memberModel: 'tp-memberModel',
+  memberStatusLine: 'tp-memberText',
   currentTag: 'tp-currentTag',
   tasks: 'tp-tasks',
   emptyNotice: 'tp-emptyNotice',
@@ -124,6 +140,17 @@ const classNames = {
   settingsLabel: 'tp-settingsLabel',
   settingsSelect: 'tp-settingsSelect',
   settingsError: 'tp-settingsError',
+  modelSeat: 'tp-modelSeat',
+  modelButton: 'tp-modelButton',
+  modelButtonText: 'tp-modelButtonText',
+  modelMenu: 'tp-modelMenu',
+  modelGroup: 'tp-modelGroup',
+  modelGroupHead: 'tp-modelGroupHead',
+  modelItemWrap: 'tp-modelItemWrap',
+  modelItem: 'tp-modelItem',
+  modelItemActive: 'tp-modelItemActive',
+  modelEffort: 'tp-modelEffort',
+  modelHint: 'tp-modelHint',
 } as const
 
 const TAG_ID = 'dsh-team-panel/TeamAction.css'

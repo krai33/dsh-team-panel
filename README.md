@@ -9,7 +9,8 @@ DeepSeek Harness Web 客户端插件：把官方 experimental Agent Teams 的会
 - **状态**：运行中 / 未运行 / 准备中（unknown 模式子代理），叠加实时 running 状态。
 - **打开成员会话**：点击成员卡片跳转（当前会话与不可跳转的成员置灰）。
 - **任务板**：只读展示主会话 `todos` 投影（`todo_write` 工具维护的清单），三态状态点 + 展开收起。
-- 无 host 端逻辑、无 RPC、无新工具；host 半边是空的 `apply()`，只为给 client bundle 一个加载锚点。
+- **切换成员模型**：卡片右侧的模型名按钮打开 provider 分组菜单；选模型或推理强度后，通过 `teamPanel/switchModel` 记录选择，下一步模型请求生效。支持主会话以及仍驻留在 Host 的子代理，不改变对话历史；已卸载的成员会显示错误，不会自动唤醒。
+- Host 服务提供头像与模型选择 RPC，不替换 stock subagent 工具。模型目录可列出的路由不保证上游调用成功；切换成功仅表示选择已记录。
 
 ## 安装
 

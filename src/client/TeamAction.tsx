@@ -14,6 +14,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { NS, type TeamKey } from './locales.ts'
 import { AvatarSeat } from './AvatarSeat.tsx'
+import { ModelSeat } from './ModelSeat.tsx'
 import css from './styles.ts'
 
 /** Business actions injected by the browser plugin. */
@@ -105,7 +106,7 @@ function TeamMemberRow({
               <span className={css.memberNameText}>{member.label ?? member.id}</span>
               {isCurrent && <Tag tone="info" className={css.currentTag}>{t('current')}</Tag>}
             </span>
-            <small>
+            <small className={css.memberStatusLine}>
               {t(memberStatusKey(status))}
               {model !== undefined && (
                 <span className={css.memberModel}>{` · ${t('model')}: ${model}`}</span>
@@ -113,6 +114,7 @@ function TeamMemberRow({
             </small>
           </span>
         </button>
+        <ModelSeat sessionId={member.id} currentModel={model} t={t} />
       </div>
     </Tooltip>
   )

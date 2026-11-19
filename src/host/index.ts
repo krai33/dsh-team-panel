@@ -36,6 +36,17 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'teamPanel/storage-error': { readonly message: string }
     /** Uploaded image content exceeds the size limit. */
     'teamPanel/asset-too-large': { readonly bytes: number; readonly maxBytes: number }
+    /** No live Agent holds the named subagent session. */
+    'teamPanel/not-live': { readonly sessionId: string }
+    /** The requested provider/model route is not resolvable. */
+    'teamPanel/route-unavailable': { readonly provider: string; readonly model: string }
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    agents: import('@deepseek-ai/dsh-agent').AgentRegistry
+    llm: import('@deepseek-ai/dsh-llm').LlmRuntime
   }
 }
 
@@ -88,7 +99,7 @@ function isImageFile(name: string): boolean {
 }
 
 export class TeamPanelAvatarService extends TypertRemoteService {
-  static inject = ['typertGateway']
+  static inject = ['typertGateway', 'agents', 'llm']
 
   private readonly dataDir: string
   private cache: AvatarMap | undefined
@@ -253,6 +264,92 @@ export class TeamPanelAvatarService extends TypertRemoteService {
       )
     }
     return { asset: stored, overwritten }
+  }
+
+  /**
+   * Build the panel's model catalog: the same provider/model data the
+   * composer's model menu shows (`llm.listProviders` → `listModels` →
+   * `resolveModelInfo`), filtered to providers whose catalog loaded.
+   * @returns provider-grouped routable models with display metadata.
+   */
+  @Remote('modelCatalog')
+  async modelCatalog(): Promise<{
+    groups: Array<{ id: string; name: string; models: Array<{ id: string; name: string; reasoningEfforts?: string[] }> }>
+    failures: Array<{ id: string; message: string }>
+  }> {
+    const providers = this.ctx.llm.listProviders()
+    const groups: Array<{ id: string; name: string; models: Array<{ id: string; name: string; reasoningEfforts?: string[] }> }> = []
+    const failures: Array<{ id: string; message: string }> = []
+    await Promise.all(providers.map(async (provider) => {
+      try {
+        const models = await this.ctx.llm.listModels(provider.id)
+        const entries = await Promise.all(models.map(async (model) => {
+          const resolved = await this.ctx.llm.resolveModelInfo(provider.id, model.id)
+          const reasoningEfforts = resolved.reasoning?.efforts.map(effort => effort.id)
+          return {
+            id: model.id,
+            name: model.name ?? model.id,
+            ...(reasoningEfforts !== undefined && reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
+          }
+        }))
+        if (entries.length > 0) groups.push({ id: provider.id, name: provider.name, models: entries })
+      } catch (error) {
+        failures.push({ id: provider.id, message: String(error) })
+      }
+    }))
+    return { groups, failures }
+  }
+
+  /**
+   * Switch one member's model route in place by recording a `model/selection`
+   * event on that member's Session — the same mechanism the
+   * subagent-model-switch plugin exposes as `subagentRoute/switch`.
+   *
+   * Works for the lead session and any live/resident child (idle continuable
+   * children stay resident; a not-live id is refused).
+   * @param request - member session id and the target route.
+   * @returns the applied selection and the member's previous route.
+   */
+  @Remote('switchModel')
+  async switchModel(request: { sessionId: string; provider: string; model: string; reasoningEffort?: string }): Promise<{
+    applied: { provider: string; model: string; reasoningEffort?: string }
+    lastUsed?: { provider: string; model: string }
+  }> {
+    if (!nonEmpty(request?.sessionId) || !nonEmpty(request?.provider) || !nonEmpty(request?.model)) {
+      throw new RemoteError(
+        'teamPanel/invalid-request',
+        'switchModel requires sessionId, provider, and model as non-empty strings',
+        {},
+      )
+    }
+    const agent = this.ctx.agents.get(request.sessionId as never)
+    if (agent === undefined) {
+      throw new RemoteError(
+        'teamPanel/not-live',
+        `no live Agent for session "${request.sessionId}"; the member must be running or resident`,
+        { sessionId: request.sessionId },
+      )
+    }
+    // Preflight the route exactly like session/selectModel does before append.
+    await this.ctx.llm.resolveCallConfig({
+      provider: request.provider,
+      model: request.model,
+      ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort as never },
+    })
+    const header = agent.session.requestHeader()?.config
+    agent.model.select({
+      provider: request.provider,
+      model: request.model,
+      ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort as never },
+    })
+    return {
+      applied: {
+        provider: request.provider,
+        model: request.model,
+        ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort },
+      },
+      ...(header === undefined ? {} : { lastUsed: { provider: header.provider, model: header.model } }),
+    }
   }
 }
 
