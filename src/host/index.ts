@@ -101,7 +101,7 @@ function isImageFile(name: string): boolean {
 }
 
 export class TeamPanelAvatarService extends TypertRemoteService {
-  static inject = ['typertGateway', 'agents', 'llm', 'workspaceRegistry']
+  static inject = ['typertGateway', 'agents', 'llm', 'workspaceRegistry', 'subagents']
 
   private readonly dataDir: string
   private cache: AvatarMap | undefined
