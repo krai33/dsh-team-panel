@@ -27,8 +27,8 @@ const stylesheet = `.tp-root{position:relative}
 .tp-memberCurrent{--dsw-elevation-stroke-color:color-mix(in srgb,var(--dsw-alias-state-business-primary) 40%,transparent);box-shadow:var(--dsw-elevation-stroke),inset 0 0 0 1px color-mix(in srgb,var(--dsw-alias-state-business-primary) 40%,transparent)}
 .tp-member:focus-within{--dsw-elevation-stroke-color:var(--dsw-alias-border-l3);box-shadow:var(--dsw-elevation-panel)}
 @media (hover:hover){.tp-member:hover{--dsw-elevation-stroke-color:var(--dsw-alias-border-l3);box-shadow:var(--dsw-elevation-panel)}}
-.tp-memberDot{display:inline-flex;align-items:center;flex:none;position:relative;height:1lh}
-.tp-runningDot{position:absolute;right:-3px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 2px var(--dsw-alias-bg-layer-2);animation:tp-breathe 1.8s ease-in-out infinite}
+.tp-memberDot{display:inline-flex;align-items:center;flex:none;position:relative}
+.tp-runningDot{position:absolute;right:-4px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 2px var(--dsw-alias-bg-layer-2);animation:tp-breathe 1.8s ease-in-out infinite}
 @keyframes tp-breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
 .tp-inactiveIcon{color:var(--dsw-alias-label-tertiary)}
 .tp-memberText{display:flex;flex-direction:column;min-width:0}
@@ -55,13 +55,13 @@ const stylesheet = `.tp-root{position:relative}
 .tp-avatarSeat{position:relative}
 .tp-avatarButton{display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}
 .tp-avatarButton:focus-visible{outline:2px solid var(--dsw-alias-border-l3);outline-offset:1px}
-.tp-avatarImage{display:block;width:22px;height:22px;border-radius:6px;object-fit:cover}
+.tp-avatarImage{display:block;width:32px;height:32px;border-radius:8px;object-fit:cover}
 .tp-avatarMenu{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);display:flex;flex-direction:column;position:fixed;z-index:110;box-sizing:border-box;min-width:200px;max-height:280px;padding:6px;overflow-y:auto;border-radius:10px;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter)}
 .tp-avatarOption{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}
 .tp-avatarOption:focus-visible{background:var(--dsw-alias-bg-layer-2)}
 @media (hover:hover){.tp-avatarOption:hover{background:var(--dsw-alias-bg-layer-2)}}
 .tp-avatarOptionActive{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent)}
-.tp-avatarThumb{display:block;width:20px;height:20px;border-radius:4px;object-fit:cover;flex:none}
+.tp-avatarThumb{display:block;width:28px;height:28px;border-radius:6px;object-fit:cover;flex:none}
 .tp-avatarName{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .tp-avatarClear{width:100%;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);font-size:11px;text-align:left;cursor:pointer}
 .tp-avatarClear:focus-visible,.tp-avatarClear:hover{color:var(--dsw-alias-label-primary)}
@@ -74,6 +74,27 @@ const stylesheet = `.tp-root{position:relative}
 .tp-settingsLabel{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dsw-alias-label-primary);font-size:12px}
 .tp-settingsSelect{flex:0 1 200px;min-width:0;max-width:200px}
 .tp-settingsError{flex:none;color:var(--dsw-alias-state-error-primary);font-size:11px}
+.tp-memberRemoveWrap{position:relative;display:flex;align-items:flex-start;gap:0;min-width:0}
+.tp-memberRemoveWrap .tp-member{flex:1 1 auto;min-width:0}
+.tp-memberRemove{display:none;flex:none;margin:4px 4px 0 0;padding:3px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer}
+.tp-memberRemoveWrap:hover .tp-memberRemove,.tp-memberRemove:focus-visible{display:inline-flex}
+.tp-memberRemove:hover:not(:disabled),.tp-memberRemove:focus-visible{color:var(--dsw-alias-state-error-primary)}
+.tp-memberRemove:disabled{cursor:default}
+.tp-confirmCard{display:flex;flex-direction:column;gap:8px;box-sizing:border-box;width:min(320px,100vw - 24px);padding:14px;border-radius:10px;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter);position:fixed;z-index:120}
+.tp-confirmTitle{color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500}
+.tp-confirmDesc{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
+.tp-confirmError{color:var(--dsw-alias-state-error-primary);font-size:12px}
+.tp-confirmActions{display:flex;justify-content:flex-end;gap:8px}
+.tp-confirmCancel,.tp-confirmGo{padding:5px 12px;border:0;border-radius:6px;font-size:12px;cursor:pointer}
+.tp-confirmCancel{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}
+.tp-confirmGo{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-bg-inverted,#fff)}
+.tp-confirmCancel:disabled,.tp-confirmGo:disabled{opacity:.6;cursor:default}
+.tp-removedSection{margin-top:12px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l2)}
+.tp-removedRow{display:flex;align-items:center;gap:8px;min-width:0;padding:2px 0}
+.tp-removedLabel{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dsw-alias-label-secondary);font-size:12px}
+.tp-restoreButton{flex:none;padding:3px 10px;border:0;border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:11px;cursor:pointer}
+.tp-restoreButton:hover:not(:disabled),.tp-restoreButton:focus-visible{color:var(--dsw-alias-label-primary)}
+.tp-restoreButton:disabled{opacity:.6;cursor:default}
 `
 
 const classNames = {
@@ -125,6 +146,19 @@ const classNames = {
   settingsLabel: 'tp-settingsLabel',
   settingsSelect: 'tp-settingsSelect',
   settingsError: 'tp-settingsError',
+  memberRemoveWrap: 'tp-memberRemoveWrap',
+  memberRemove: 'tp-memberRemove',
+  confirmCard: 'tp-confirmCard',
+  confirmTitle: 'tp-confirmTitle',
+  confirmDesc: 'tp-confirmDesc',
+  confirmError: 'tp-confirmError',
+  confirmActions: 'tp-confirmActions',
+  confirmCancel: 'tp-confirmCancel',
+  confirmGo: 'tp-confirmGo',
+  removedSection: 'tp-removedSection',
+  removedRow: 'tp-removedRow',
+  removedLabel: 'tp-removedLabel',
+  restoreButton: 'tp-restoreButton',
 } as const
 
 const TAG_ID = 'dsh-team-panel/TeamAction.css'
