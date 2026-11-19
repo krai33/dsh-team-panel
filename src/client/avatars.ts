@@ -1,12 +1,12 @@
 /**
  * Client-side avatar store: fetch-backed view of the host `teamPanel`
- * namespace (`list`/`assign`) over the browser `/api` Connection RPC channel.
+ * namespace over the browser `/api` Connection RPC channel.
  *
  * The same channel the CLI uses (cookie-authenticated POST with the
  * `{type:"client-request",…}` envelope) is reachable from the page, so the
  * plugin needs no generated Typert client artifact. The panel and the
- * settings tab subscribe through `useSyncExternalStore`; writes publish
- * optimistically so member cards re-render immediately.
+ * settings tab subscribe through `useSyncExternalStore`; confirmed writes
+ * update the shared snapshot.
  */
 
 export interface AvatarSnapshot {
@@ -14,6 +14,8 @@ export interface AvatarSnapshot {
   readonly assignments: Readonly<Record<string, string>>
   /** Available image file names from the plugin data directory. */
   readonly assets: readonly string[]
+  /** User-added images that may be deleted. */
+  readonly deletableAssets: readonly string[]
   /** Whether the initial `list` call has settled (either way). */
   readonly loaded: boolean
 }
@@ -28,18 +30,26 @@ export class AvatarAssignError extends Error {
   }
 }
 
-interface RpcResult<T> {
-  ok: boolean
-  value?: T
-  message?: string
-  details?: { code?: string }
-}
+type RpcResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
+type AvatarList = Omit<AvatarSnapshot, 'loaded' | 'deletableAssets'> & Pick<Partial<AvatarSnapshot>, 'deletableAssets'>
 
 const listeners = new Set<() => void>()
 let rpcCounter = 0
 
-let snapshot: AvatarSnapshot = { assignments: {}, assets: [], loaded: false }
+let snapshot: AvatarSnapshot = { assignments: {}, assets: [], deletableAssets: [], loaded: false }
 let inflight: Promise<void> | undefined
+let operations: Promise<void> = Promise.resolve()
+
+function serialize<T>(run: () => Promise<T>): Promise<T> {
+  const next = operations.then(run)
+  operations = next.then(() => undefined, () => undefined)
+  return next
+}
+
+async function refresh(): Promise<void> {
+  const { deletableAssets = [], ...value } = await call<AvatarList>('list', {})
+  publish({ ...value, deletableAssets, loaded: true })
+}
 
 function publish(next: AvatarSnapshot): void {
   snapshot = next
@@ -71,10 +81,10 @@ async function call<T>(method: string, args: Record<string, unknown>): Promise<T
   const envelope = await response.json() as { type: string; result: RpcResult<T> }
   const result = envelope.result
   if (result === undefined || !result.ok) {
-    const code = result?.details?.code ?? 'teamPanel/transport'
-    throw new AvatarAssignError(result?.message ?? code, code)
+    const code = result?.error?.code ?? 'teamPanel/transport'
+    throw new AvatarAssignError(result?.error?.message ?? code, code)
   }
-  return result.value as T
+  return result.value
 }
 
 /**
@@ -82,8 +92,7 @@ async function call<T>(method: string, args: Record<string, unknown>): Promise<T
  */
 export function loadAvatars(): void {
   if (inflight !== undefined) return
-  inflight = call<{ assignments: Record<string, string>; assets: string[] }>('list', {})
-    .then(value => { publish({ assignments: value.assignments, assets: value.assets, loaded: true }) })
+  inflight = serialize(refresh)
     .catch(() => { publish({ ...snapshot, loaded: true }) })
     .finally(() => { inflight = undefined })
 }
@@ -116,21 +125,11 @@ export async function uploadAvatar(file: File): Promise<string> {
     reader.onerror = () => { reject(new AvatarAssignError('reading the file failed', 'read-error')) }
     reader.readAsDataURL(file)
   })
-  const value = await call<{ asset: string; overwritten: boolean }>('upload', {
-    request: { name: file.name, data },
+  return serialize(async () => {
+    const value = await call<{ asset: string }>('upload', { request: { name: file.name, data } })
+    await refresh()
+    return value.asset
   })
-  // Refresh the asset list so pickers see the new file immediately.
-  await refreshAfterWrite()
-  return value.asset
-}
-
-/**
- * Re-read the mapping after an external change (upload) without the
- * in-flight dedup: bypasses `loadAvatars`'s early return.
- */
-async function refreshAfterWrite(): Promise<void> {
-  const value = await call<{ assignments: Record<string, string>; assets: string[] }>('list', {})
-  publish({ assignments: value.assignments, assets: value.assets, loaded: true })
 }
 
 /**
@@ -140,8 +139,17 @@ async function refreshAfterWrite(): Promise<void> {
  * @throws {AvatarAssignError} when the host rejects the write.
  */
 export async function assignAvatar(sessionId: string, asset: string): Promise<void> {
-  const value = await call<{ assignments: Record<string, string> }>('assign', {
-    request: { sessionId, asset },
+  return serialize(async () => {
+    const { assignments } = await call<Pick<AvatarSnapshot, 'assignments'>>('assign', { request: { sessionId, asset } })
+    publish({ ...snapshot, assignments, loaded: true })
   })
-  publish({ ...snapshot, assignments: value.assignments, loaded: true })
+}
+
+/** Delete one custom image and publish the confirmed library and assignment changes. */
+export function deleteAvatar(asset: string): Promise<void> {
+  return serialize(async () => {
+    const { assignments } = await call<Pick<AvatarSnapshot, 'assignments'>>('deleteAvatar', { request: { asset } })
+    publish({ ...snapshot, assignments, assets: snapshot.assets.filter(name => name !== asset),
+      deletableAssets: snapshot.deletableAssets.filter(name => name !== asset), loaded: true })
+  })
 }

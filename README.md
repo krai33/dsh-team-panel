@@ -35,7 +35,7 @@ pnpm add file:/home/xiwa/gitlab/dsh-team-panel
 npm install --no-save @types/react@19 @types/react-dom@19   # 一次性
 python3 scripts/regen-rc1-types.py   # 重建 /tmp/rc1-types + tsconfig.client.json（需 master 仓库在 ../deepseek-harness）
 npm run build                        # host tsc + 自有 client 源码类型检查 + tsdown bundle
-npm test                             # 无真实 Host 调用的模型选择适配器测试
+npm test                             # 构建后运行模型适配器和临时头像库测试
 ```
 
 产物：`lib/client.js`（浏览器闭包工厂 bundle，`window.__ModuleLoader__.load` 自注册）、`lib/host/index.js`（头像与 live-agent 模型选择服务）。
@@ -63,12 +63,13 @@ npm test                             # 无真实 Host 调用的模型选择适�
 
 成员卡片左侧的图标可以点击：
 
-- **卡片上**：点击图标（未运行状态下显示）弹出图片选择菜单，选中立即生效；已分配时菜单里可“恢复默认图标”。运行中成员仍显示状态点（避免遮蔽 running 信号），停止后头像回归。
+- **卡片上**：点击头像打开图片选择菜单。选择图片只更改当前成员；“恢复默认图标”只清除当前成员的分配。运行中的头像继续显示角落状态点。
+- **删除图片**：点击头像菜单里自定义图片旁的垃圾桶并确认。图片从插件头像库移除，所有使用它的成员恢复默认头像；内置图片及上传前的原图不受影响。
 - **插件设置面板**：设置 → 插件 → Team panel，每个 lead/成员一行下拉框，预先配置好映射（不必点开 team 面板）。
 - **添加图片**：把图片文件（png/jpg/jpeg/gif/webp/svg）放进本仓库 `data/assets/` 目录即可，无需改代码；映射存 `data/avatars.json`（sessionId → 文件名）。
 - 图片通过 client-modules 包资产路由下发（`/plugins/dsh-team-panel/assets/<file>`），浏览器带 cookie 访问。
 
-host 半边是一个 TypertRemoteService（`teamPanel` 命名空间，`list`/`assign` 两个方法），assign 校验文件存在 + 扩展名白名单 + `basename` 归一化，原子写盘。
+`teamPanel` 的头像接口串行处理目录和分配变更，并原子保存分配。删除仅接受头像库中非内置的普通图片文件；上传使用唯一文件名，避免重新上传时复用已缓存的图片地址。
 
 ## 已知限制
 

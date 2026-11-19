@@ -56,8 +56,13 @@ const stylesheet = `.tp-root{position:relative}
 .tp-avatarButton{display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}
 .tp-avatarButton:focus-visible{outline:2px solid var(--dsw-alias-border-l3);outline-offset:1px}
 .tp-avatarImage{display:block;width:32px;height:32px;border-radius:8px;object-fit:cover}
-.tp-avatarMenu{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);display:flex;flex-direction:column;position:fixed;z-index:110;box-sizing:border-box;min-width:200px;max-height:280px;padding:6px;overflow-y:auto;border-radius:10px;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter)}
-.tp-avatarOption{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}
+.tp-avatarMenu{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);display:flex;flex-direction:column;position:fixed;z-index:110;box-sizing:border-box;min-width:200px;max-height:280px;padding:6px;overflow-y:auto;max-width:min(320px,calc(100vw - 24px));border-radius:10px;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter)}
+.tp-avatarOptionRow{display:flex;align-items:center;min-width:0;gap:4px}
+.tp-avatarOption{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}
+.tp-avatarDelete{display:grid;place-items:center;flex:none;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}
+.tp-avatarDelete:focus-visible,.tp-avatarDelete:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-state-error-primary)}
+.tp-avatarDelete:disabled{opacity:.6;cursor:default}
+.tp-avatarConfirm{display:flex;flex-direction:column;gap:8px;width:260px;max-width:100%;padding:8px;box-sizing:border-box;overflow-wrap:anywhere}
 .tp-avatarOption:focus-visible{background:var(--dsw-alias-bg-layer-2)}
 @media (hover:hover){.tp-avatarOption:hover{background:var(--dsw-alias-bg-layer-2)}}
 .tp-avatarOptionActive{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent)}
@@ -133,6 +138,9 @@ const classNames = {
   avatarButton: 'tp-avatarButton',
   avatarImage: 'tp-avatarImage',
   avatarMenu: 'tp-avatarMenu',
+  avatarOptionRow: 'tp-avatarOptionRow',
+  avatarDelete: 'tp-avatarDelete',
+  avatarConfirm: 'tp-avatarConfirm',
   avatarOption: 'tp-avatarOption',
   avatarOptionActive: 'tp-avatarOptionActive',
   avatarThumb: 'tp-avatarThumb',

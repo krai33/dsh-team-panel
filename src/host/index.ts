@@ -13,15 +13,16 @@
  *   `exports["./assets/*"]`), so the same file serves both the picker and
  *   the member card.
  *
- * Images are pre-provisioned by the operator (drop files into
- * `data/assets/`); assignment is the only write path. The mapping file is
- * written atomically (tmp + rename) and cached in memory between writes.
+ * Images can be uploaded or placed in the asset directory. Deleting an image
+ * clears every assignment to it. Avatar operations serialize file changes and
+ * publish the assignment map only after its atomic write.
  */
 
-import { readFile, rename, writeFile, mkdir } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { RemoteErrorDetailsMap } from '@deepseek-ai/dsh-typert-protocol'
@@ -61,6 +62,8 @@ export interface AvatarListValue {
   assignments: AvatarMap
   /** File names available in the plugin's `data/assets/` directory. */
   assets: string[]
+  /** User-added images that may be deleted from the library. */
+  deletableAssets: string[]
 }
 
 /** Request body of `assign`. */
@@ -88,7 +91,8 @@ export interface AvatarUploadValue {
 }
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'])
-/** Upload size cap: avatars render at ~22px; generous for any real image. */
+const BUILTIN_ASSETS = new Set(['lead.png', 'member.png'])
+/** Upload cap in decoded bytes. */
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 
 function nonEmpty(value: unknown): value is string {
@@ -100,11 +104,23 @@ function isImageFile(name: string): boolean {
   return dot > 0 && IMAGE_EXTENSIONS.has(name.slice(dot).toLowerCase())
 }
 
+function storageError(action: string, cause: unknown): RemoteError<'teamPanel/storage-error'> {
+  const message = `${action} failed: ${String(cause)}`
+  return new RemoteError('teamPanel/storage-error', message, { message }, { cause })
+}
+
 export class TeamPanelAvatarService extends TypertRemoteService {
   static inject = ['typertGateway', 'agents', 'llm', 'workspaceRegistry', 'subagents']
 
   private readonly dataDir: string
   private cache: AvatarMap | undefined
+  private avatarOperations: Promise<void> = Promise.resolve()
+
+  private withAvatars<T>(run: () => Promise<T>): Promise<T> {
+    const result = this.avatarOperations.then(run)
+    this.avatarOperations = result.then(() => undefined, () => undefined)
+    return result
+  }
 
   constructor(ctx: Context, config: { dataDir?: string } = {}) {
     super(ctx, 'teamPanel', { namespace: 'teamPanel' })
@@ -124,9 +140,18 @@ export class TeamPanelAvatarService extends TypertRemoteService {
     try {
       const raw = await readFile(join(this.dataDir, 'avatars.json'), 'utf8')
       const parsed: unknown = JSON.parse(raw)
-      this.cache = typeof parsed === 'object' && parsed !== null ? parsed as AvatarMap : {}
-    } catch {
-      this.cache = {}
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error('expected an avatar assignment object')
+      }
+      const entries: [string, string][] = []
+      for (const [id, asset] of Object.entries(parsed)) {
+        if (typeof asset !== 'string') throw new Error('expected avatar file names as strings')
+        entries.push([id, asset])
+      }
+      this.cache = Object.fromEntries(entries)
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') this.cache = {}
+      else throw storageError('reading avatar assignments', error)
     }
     return this.cache
   }
@@ -149,16 +174,17 @@ export class TeamPanelAvatarService extends TypertRemoteService {
    */
   @Remote('list')
   async list(): Promise<AvatarListValue> {
-    const assets: string[] = []
-    const assetsDir = join(this.dataDir, 'assets')
-    if (existsSync(assetsDir)) {
-      const { readdir } = await import('node:fs/promises')
-      for (const entry of await readdir(assetsDir, { withFileTypes: true })) {
-        if (entry.isFile() && isImageFile(entry.name)) assets.push(entry.name)
+    return this.withAvatars(async () => {
+      const assets: string[] = []
+      const assetsDir = join(this.dataDir, 'assets')
+      if (existsSync(assetsDir)) {
+        for (const entry of await readdir(assetsDir, { withFileTypes: true })) {
+          if (entry.isFile() && isImageFile(entry.name)) assets.push(entry.name)
+        }
       }
-    }
-    assets.sort()
-    return { assignments: await this.readMap(), assets }
+      assets.sort()
+      return { assignments: await this.readMap(), assets, deletableAssets: assets.filter(asset => !BUILTIN_ASSETS.has(asset)) }
+    })
   }
 
   /**
@@ -182,41 +208,85 @@ export class TeamPanelAvatarService extends TypertRemoteService {
         {},
       )
     }
-    const current = { ...await this.readMap() }
-    if (request.asset === '') {
-      delete current[request.sessionId]
-    } else {
-      const file = join(this.dataDir, 'assets', basename(request.asset))
-      if (!existsSync(file) || !isImageFile(file)) {
-        throw new RemoteError(
-          'teamPanel/unknown-asset',
-          `asset "${request.asset}" is not an image file under data/assets/`,
-          { asset: request.asset },
-        )
+    return this.withAvatars(async () => {
+      const current = { ...await this.readMap() }
+      if (request.asset === '') {
+        delete current[request.sessionId]
+      } else {
+        const file = join(this.dataDir, 'assets', basename(request.asset))
+        if (!existsSync(file) || !isImageFile(file)) {
+          throw new RemoteError(
+            'teamPanel/unknown-asset',
+            `asset "${request.asset}" is not an image file under data/assets/`,
+            { asset: request.asset },
+          )
+        }
+        Object.defineProperty(current, request.sessionId, { value: basename(request.asset), enumerable: true, configurable: true, writable: true })
       }
-      current[request.sessionId] = basename(request.asset)
-    }
-    try {
-      await this.writeMap(current)
-    } catch (error) {
-      throw new RemoteError(
-        'teamPanel/storage-error',
-        `writing avatars.json failed: ${String(error)}`,
-        { message: String(error) },
-      )
-    }
-    return { assignments: current }
+      try {
+        await this.writeMap(current)
+      } catch (error) {
+        throw storageError('writing avatar assignments', error)
+      }
+      return { assignments: current }
+    })
   }
 
   /**
-   * Store one uploaded image into `data/assets/` and refresh the asset list.
-   *
-   * The name is sanitized to its basename, forced lowercase extension from
-   * the allowlist, and given a short random suffix when it would overwrite
-   * an existing different file — the asset route caches by file name, so
-   * content changes must change names to reach the browser.
+   * Delete a user-added image and clear all member assignments to it.
+   * @param request - exact file name from the avatar library.
+   * @returns the committed assignment map after deletion.
+   * @throws if the name is invalid, reserved, missing, or the change cannot be committed.
+   */
+  @Remote('deleteAvatar')
+  async deleteAvatar(request: { asset: string }): Promise<{ assignments: AvatarMap }> {
+    const asset = request?.asset
+    if (!nonEmpty(asset) || asset !== basename(asset) || /[\\\\/\u0000-\u001f]/u.test(asset)
+      || !isImageFile(asset) || BUILTIN_ASSETS.has(asset)) {
+      throw new RemoteError('teamPanel/invalid-request', 'expected a deletable avatar file name', {})
+    }
+    return this.withAvatars(async () => {
+      const previous = await this.readMap()
+      const current = Object.fromEntries(Object.entries(previous).filter(([, file]) => file !== asset))
+      const assetsDir = resolve(this.dataDir, 'assets')
+      const file = join(assetsDir, asset)
+      const staged = resolve(this.dataDir, `.avatar-delete-${randomUUID()}`)
+      try {
+        const root = await realpath(this.dataDir)
+        if (await realpath(assetsDir) !== join(root, 'assets') || !(await lstat(file)).isFile()) {
+          throw new RemoteError('teamPanel/unknown-asset', 'avatar is not a regular library file', { asset })
+        }
+        await rename(file, staged)
+      } catch (error) {
+        if (error instanceof RemoteError) throw error
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          throw new RemoteError('teamPanel/unknown-asset', 'avatar is not in the library', { asset })
+        }
+        throw storageError('staging avatar deletion', error)
+      }
+      try {
+        if (Object.keys(current).length !== Object.keys(previous).length) await this.writeMap(current)
+      } catch (error) {
+        try {
+          await rename(staged, file)
+        } catch (rollbackError) {
+          throw storageError('saving avatar deletion and restoring the image', new AggregateError([error, rollbackError]))
+        }
+        throw storageError('clearing avatar assignments', error)
+      }
+      try {
+        await unlink(staged)
+      } catch (error) {
+        this.ctx.logger.warn('team-panel: avatar removed from the library but its staged file could not be cleaned up: %s', String(error))
+      }
+      return { assignments: current }
+    })
+  }
+
+  /**
+   * Store a browser upload under a unique asset URL, even after re-uploading a deleted name.
    * @param request - desired file name and base64 image bytes.
-   * @returns the stored file name and whether an existing name was replaced.
+   * @returns the stored file name; existing files are never overwritten.
    */
   @Remote('upload')
   async upload(request: AvatarUploadRequest): Promise<AvatarUploadValue> {
@@ -247,25 +317,19 @@ export class TeamPanelAvatarService extends TypertRemoteService {
         { bytes: bytes.length, maxBytes: MAX_UPLOAD_BYTES },
       )
     }
-    const assetsDir = join(this.dataDir, 'assets')
-    await mkdir(assetsDir, { recursive: true })
-    let stored = basename(request.name).replace(/[^\w.-]+/g, '_')
-    let overwritten = false
-    if (existsSync(join(assetsDir, stored))) {
-      overwritten = true
-      const dot = stored.lastIndexOf('.')
-      stored = `${stored.slice(0, dot)}-${Math.random().toString(36).slice(2, 6)}${stored.slice(dot)}`
-    }
-    try {
-      await writeFile(join(assetsDir, stored), bytes)
-    } catch (error) {
-      throw new RemoteError(
-        'teamPanel/storage-error',
-        `writing ${stored} failed: ${String(error)}`,
-        { message: String(error) },
-      )
-    }
-    return { asset: stored, overwritten }
+    const filename = basename(request.name).replace(/[^\w.-]+/g, '_')
+    const dot = filename.lastIndexOf('.')
+    const stored = `${filename.slice(0, dot).slice(0, 180)}-${randomUUID().slice(0, 12)}${filename.slice(dot).toLowerCase()}`
+    return this.withAvatars(async () => {
+      const assetsDir = join(this.dataDir, 'assets')
+      try {
+        await mkdir(assetsDir, { recursive: true })
+        await writeFile(join(assetsDir, stored), bytes, { flag: 'wx' })
+      } catch (error) {
+        throw storageError('writing uploaded avatar', error)
+      }
+      return { asset: stored, overwritten: false }
+    })
   }
 
   /**
