@@ -11,7 +11,7 @@ DeepSeek Harness Web 客户端插件：把官方 experimental Agent Teams 的会
 - **任务板**：只读展示主会话 `todos` 投影（`todo_write` 工具维护的清单），三态状态点 + 展开收起。
 - **子会话模型选择**：打开 continuable 子会话后，在输入框底部使用与主会话相同的原生模型选择器（模型搜索、供应商分组、推理强度）。卡片只显示模型信息，不放切换按钮。子会话通过 `teamPanel/switchModel` 记录选择，下一步模型请求生效，不改变对话历史；已卸载的成员会显示错误，不会自动唤醒。主会话仍使用原生接口。
 - **移除成员**：悬停成员卡片右上角出现 ✕，确认后调用 stock `workspace/archiveSession`（`stopActivity: true`）停止其运行并归档会话；父会话无法再唤醒它。会话历史保留，可在 设置 → 插件 → Team panel（Built-in plugin settings 卡片）或侧栏“仅显示已归档”里恢复（`workspace/unarchiveSession`）。花名册通过 `teamPanel/archivedChildren` RPC 过滤已归档子代理。
-- **模型视图同步过滤**：host 半边挂了 `tools/post-execute` 监听，改写成功的 `list_agents` 结果——已归档（从团队移除）的成员不再出现在模型可见的智能体列表里（`send_message` 的目标是发送方自选的 id，该路径不拦截；归档门会在投递层拒绝）。
+- **模型视图同步过滤**：host 半边挂了 `tools/post-execute` 监听，改写成功的 `list_agents` 结果——已归档（从团队移除）的成员不再出现在模型可见的智能体列表里。另挂 `tools/pre-execute` 监听：`send_message`/`interrupt_agent` 目标为已移除成员时直接拒绝，并提示可在 Team panel 设置中恢复；恢复后立即放行。
 - Host 服务提供头像与模型选择 RPC，不替换 stock subagent 工具。模型目录可列出的路由不保证上游调用成功；切换成功仅表示选择已记录。
 
 ## 安装

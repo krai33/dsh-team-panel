@@ -480,10 +480,33 @@ function filterListAgents(ctx: Context): () => void {
   return listener
 }
 
+/**
+ * Refuse `send_message` and `interrupt_agent` calls whose target the human
+ * already removed from the team, with a reason naming the removal. Without
+ * this the call reaches the delivery layer and fails with an opaque
+ * authorization error instead of the actionable one.
+ */
+function refuseRemovedTargets(ctx: Context): () => void {
+  const listener = ctx.on('tools/pre-execute', async (exec, next) => {
+    if (exec.name === 'send_message' || exec.name === 'interrupt_agent') {
+      const target = (exec.arguments as { agent_id?: unknown } | undefined | null)?.agent_id
+      if (typeof target === 'string' && ctx.workspaceRegistry.archivedSessionIds.includes(target as never)) {
+        return {
+          kind: 'deny',
+          reason: `agent ${target} was removed from the team; restore it in the Team panel settings to message it again`,
+        }
+      }
+    }
+    return next()
+  })
+  return listener
+}
+
 export const name = 'dsh-team-panel'
 export const inject = TeamPanelAvatarService.inject
 
 export function apply(ctx: Context, config: { dataDir?: string } = {}): void {
   ctx.plugin(TeamPanelAvatarService, config)
   ctx.effect(() => filterListAgents(ctx), 'team-panel: list_agents archive filter')
+  ctx.effect(() => refuseRemovedTargets(ctx), 'team-panel: removed-target refusal')
 }
