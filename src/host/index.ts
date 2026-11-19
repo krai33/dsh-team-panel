@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { RemoteErrorDetailsMap } from '@deepseek-ai/dsh-typert-protocol'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
@@ -441,9 +442,48 @@ export class TeamPanelAvatarService extends TypertRemoteService {
   }
 }
 
+/** One row of `list_agents` output as the model sees it. */
+interface AgentListRow {
+  readonly kind: string
+  readonly id: string
+  readonly status?: string
+  readonly label?: string
+  readonly parent?: string
+  readonly depth?: number
+}
+
+/** Re-render one filtered `list_agents` result the way the stock tool renders it. */
+function renderAgentRows(rows: readonly AgentListRow[]): JsonValue[] {
+  return rows.map(row => row as unknown as JsonValue)
+}
+
+/**
+ * Filter archived (team-removed) subagents out of the model-facing
+ * `list_agents` result so agents the human removed stay invisible to the
+ * model too. Runs as a `tools/post-execute` listener: only successful
+ * `list_agents` calls are rewritten; every other result passes through.
+ */
+function filterListAgents(ctx: Context): () => void {
+  const listener = ctx.on('tools/post-execute', async (exec, result, next) => {
+    const rows: readonly AgentListRow[] | undefined = exec.name === 'list_agents' && !result.isError
+      && Array.isArray(result.value)
+      ? result.value as unknown as readonly AgentListRow[] : undefined
+    const archived = rows !== undefined && rows.length > 0
+      ? new Set(ctx.workspaceRegistry.archivedSessionIds) : new Set<string>()
+    const kept = rows?.filter(row => !archived.has(row.id))
+    const rewrite = kept !== undefined && kept.length !== rows?.length
+    const decision = await next()
+    if (!rewrite || decision.kind !== 'accept' || kept === undefined) return decision
+    // Value replacement alone re-renders through the stock tool's own output.render.
+    return { kind: 'accept', value: renderAgentRows(kept) }
+  })
+  return listener
+}
+
 export const name = 'dsh-team-panel'
 export const inject = TeamPanelAvatarService.inject
 
 export function apply(ctx: Context, config: { dataDir?: string } = {}): void {
   ctx.plugin(TeamPanelAvatarService, config)
+  ctx.effect(() => filterListAgents(ctx), 'team-panel: list_agents archive filter')
 }
