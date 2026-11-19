@@ -20,7 +20,7 @@ const stylesheet = `.tp-root{position:relative}
 .tp-panel h3{display:flex;align-items:center;gap:8px;margin:16px 0 8px 4px;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500}
 .tp-body section:first-of-type h3{margin-top:8px}
 .tp-roster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.tp-member{display:flex;align-items:flex-start;gap:8px;min-width:0;padding:10px 12px;border:0;--dsw-elevation-stroke-color:var(--dsw-alias-border-l2);box-shadow:var(--dsw-elevation-stroke);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);text-align:left}
+.tp-member{display:flex;align-items:flex-start;gap:8px;min-width:0;padding:10px 12px;border:0;--dsw-elevation-stroke-color:var(--dsw-alias-border-l2);box-shadow:var(--dsw-elevation-stroke);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:13px;text-align:left}
 .tp-memberOpen{display:flex;flex:1 1 auto;min-width:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .tp-memberOpen:disabled{cursor:default}
 .tp-memberOpen:not(:disabled):focus-visible{outline:2px solid var(--dsw-alias-border-l3);outline-offset:2px;border-radius:6px}
