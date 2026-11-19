@@ -9,7 +9,7 @@ DeepSeek Harness Web 客户端插件：把官方 experimental Agent Teams 的会
 - **状态**：运行中 / 未运行 / 准备中（unknown 模式子代理），叠加实时 running 状态。
 - **打开成员会话**：点击成员卡片跳转（当前会话与不可跳转的成员置灰）。
 - **任务板**：只读展示主会话 `todos` 投影（`todo_write` 工具维护的清单），三态状态点 + 展开收起。
-- **切换成员模型**：卡片右侧的模型名按钮打开 provider 分组菜单；选模型或推理强度后，通过 `teamPanel/switchModel` 记录选择，下一步模型请求生效。支持主会话以及仍驻留在 Host 的子代理，不改变对话历史；已卸载的成员会显示错误，不会自动唤醒。
+- **子会话模型选择**：打开 continuable 子会话后，在输入框底部使用与主会话相同的原生模型选择器（模型搜索、供应商分组、推理强度）。卡片只显示模型信息，不放切换按钮。子会话通过 `teamPanel/switchModel` 记录选择，下一步模型请求生效，不改变对话历史；已卸载的成员会显示错误，不会自动唤醒。主会话仍使用原生接口。
 - Host 服务提供头像与模型选择 RPC，不替换 stock subagent 工具。模型目录可列出的路由不保证上游调用成功；切换成功仅表示选择已记录。
 
 ## 安装
@@ -33,10 +33,11 @@ pnpm add file:/home/xiwa/gitlab/dsh-team-panel
 ```sh
 npm install --no-save @types/react@19 @types/react-dom@19   # 一次性
 python3 scripts/regen-rc1-types.py   # 重建 /tmp/rc1-types + tsconfig.client.json（需 master 仓库在 ../deepseek-harness）
-npm run build                        # host tsc + client typecheck 门禁 + tsdown bundle
+npm run build                        # host tsc + 自有 client 源码类型检查 + tsdown bundle
+npm test                             # 无真实 Host 调用的模型选择适配器测试
 ```
 
-产物：`lib/client.js`（浏览器闭包工厂 bundle，`window.__ModuleLoader__.load` 自注册）、`lib/host/index.js`（空 host 半边）。
+产物：`lib/client.js`（浏览器闭包工厂 bundle，`window.__ModuleLoader__.load` 自注册）、`lib/host/index.js`（头像与 live-agent 模型选择服务）。
 
 类型检查的 `tsconfig.client.json` `paths` 指向 master 仓库 rc.1 tag（`2f97f60455`）提取的源码（`/tmp/rc1-types`），与运行时 0.2.2-rc.1 严格一致；提取树自带 dev 依赖噪音（shiki/clsx 等），`scripts/typecheck-client.mjs` 只对插件自身源码报错生效。
 
@@ -45,6 +46,7 @@ npm run build                        # host tsc + client typecheck 门禁 + tsdo
 - **客户端装载**：`package.json` 的 `dsh.client` 声明（`platform: web` + `inject` 列表）由 host 侧 `@deepseek-ai/dsh-client-modules` 扫描，自动组成 boot graph；浏览器 shell 通过 `window.__DSH_BOOT__` 拉取 `/plugins/dsh-team-panel/client.js` 并注册工厂。
 - **平台外部依赖**：`react`、`react-dom`、`@deepseek-ai/dsh-client-ui-primitives` 等由 loader 的种子表在浏览器内提供，bundle 内是 `require(...)` 调用。
 - **数据**：面板只读 stock 投影（`subagentCatalog`、`modelSelection`、`todos`），随会话事件流增量更新，无需轮询。
+- **模型选择 UI**：从已安装的原生 `conversation.input.model` 注册取得组件，在子会话的 `conversation.input.right` 扩展位复用；不修改原生注册或主会话行为。子会话使用原生默认模型标签（含 badge），不转发第三方标签扩展。目录读取 Host 级 `session/modelCatalog`，无需保持父会话页面打开；选择只走 `teamPanel/switchModel`，不会通过原生 Agent-bound RPC 激活历史会话。
 - **文案**：通过 `ctx.locale.register('team-panel', { zh, en })` 注册，slot 注册带 `locale: NS` 使 `t` 注入。
 
 ## 与官方 experimental 版的差异

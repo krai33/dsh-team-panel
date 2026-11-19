@@ -9,6 +9,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { TeamAction, type TeamActionInjected } from './TeamAction.tsx'
 import { TeamPanelTab } from './TeamPanelTab.tsx'
+import { registerComposerModel } from './composer-model.ts'
 import { en, NS, zh, type TeamKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -29,6 +30,7 @@ export const inject = ['sessions', 'uiWorkspace', 'slots', 'locale']
  */
 export function registerTeamPanelUi(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'team-panel: dictionaries')
+  registerComposerModel(ctx)
   const sessions = ctx.sessions
   const leadSessionId = (sessionId: SessionId): SessionId => {
     const address = sessions.binding(sessionId)?.session.getSnapshot().subagent?.address
