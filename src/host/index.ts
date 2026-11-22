@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { RemoteErrorDetailsMap } from '@deepseek-ai/dsh-typert-protocol'
@@ -40,6 +41,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'teamPanel/asset-too-large': { readonly bytes: number; readonly maxBytes: number }
     /** No live Agent holds the named subagent session. */
     'teamPanel/not-live': { readonly sessionId: string }
+    /** The parent session needed to wake a cold member is not live. */
+    'teamPanel/parent-not-live': { readonly sessionId: string; readonly parentSessionId: string }
     /** The requested provider/model route is not resolvable. */
     'teamPanel/route-unavailable': { readonly provider: string; readonly model: string }
   }
@@ -116,6 +119,8 @@ export class TeamPanelAvatarService extends TypertRemoteService {
   private readonly dataDir: string
   private cache: AvatarMap | undefined
   private avatarOperations: Promise<void> = Promise.resolve()
+  /** One queued route change per waking member, applied inside the child's agent/created listeners. */
+  private readonly wakeSelections = new Map<string, { provider: string; model: string; reasoningEffort?: never }>()
 
   private withAvatars<T>(run: () => Promise<T>): Promise<T> {
     const result = this.avatarOperations.then(run)
@@ -372,13 +377,23 @@ export class TeamPanelAvatarService extends TypertRemoteService {
    * event on that member's Session — the same mechanism the
    * subagent-model-switch plugin exposes as `subagentRoute/switch`.
    *
-   * Works for the lead session and any live/resident child (idle continuable
-   * children stay resident; a not-live id is refused).
-   * @param request - member session id and the target route.
+   * Works for the lead session and any live/resident child. A cold continuable
+   * child with a live parent (request `parentSessionId`) is first woken through
+   * the same subagent delivery the composer uses — the wake prompt is one
+   * visible `[model changed: …]` notice — because opening a child view never
+   * materializes its Agent. Children without a live parent, and one-shot or
+   * external ids that no delivery can wake, stay refused.
+   * @param request - member session id, the target route, and the direct parent for wake delivery.
    * @returns the applied selection and the member's previous route.
    */
   @Remote('switchModel')
-  async switchModel(request: { sessionId: string; provider: string; model: string; reasoningEffort?: string }): Promise<{
+  async switchModel(request: {
+    sessionId: string
+    provider: string
+    model: string
+    reasoningEffort?: string
+    parentSessionId?: string
+  }): Promise<{
     applied: { provider: string; model: string; reasoningEffort?: string }
     lastUsed?: { provider: string; model: string }
   }> {
@@ -389,11 +404,20 @@ export class TeamPanelAvatarService extends TypertRemoteService {
         {},
       )
     }
-    const agent = this.ctx.agents.get(request.sessionId as never)
+    let agent = this.ctx.agents.get(request.sessionId as never)
+    if (agent === undefined && nonEmpty(request.parentSessionId)) {
+      agent = await this.wakeChildForMember({
+        sessionId: request.sessionId,
+        provider: request.provider,
+        model: request.model,
+        ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort },
+        parentSessionId: request.parentSessionId,
+      })
+    }
     if (agent === undefined) {
       throw new RemoteError(
         'teamPanel/not-live',
-        `no live Agent for session "${request.sessionId}"; the member must be running or resident`,
+        `no live Agent for session "${request.sessionId}"; the member must be running, resident, or woken through its live parent session`,
         { sessionId: request.sessionId },
       )
     }
@@ -439,6 +463,81 @@ export class TeamPanelAvatarService extends TypertRemoteService {
     const children = await this.ctx.subagents.listChildren(request.sessionId as never)
     const archived = new Set(this.ctx.workspaceRegistry.archivedSessionIds)
     return { archived: children.filter(child => archived.has(child.id)).map(child => child.id) }
+  }
+
+  /**
+   * Wake one cold continuable child through the same delivery the composer
+   * uses, so opening a read-only child view is never a prerequisite for a
+   * model switch. The wake prompt is a single visible notice phrased like the
+   * harness' own model-change notice, so the child log stays truthful about
+   * the route change; delivery itself materializes the Agent (cold resume).
+   *
+   * The target route is recorded BEFORE delivery and applied from a global
+   * `agent/created` listener: those listeners run serially before the child's
+   * queued inbox work is released, so the first wake step already prepares on
+   * the new route instead of racing the switch (a lost race replays the dead
+   * route the wake was meant to replace).
+   * @param request - child id, target route, and the live direct parent id.
+   * @returns the materialized child Agent, or undefined when the wake did not publish one.
+   */
+  private async wakeChildForMember(request: {
+    readonly sessionId: string
+    readonly provider: string
+    readonly model: string
+    readonly reasoningEffort?: string
+    readonly parentSessionId: string
+  }): Promise<Agent | undefined> {
+    const parent = this.ctx.agents.get(request.parentSessionId as never)
+    if (parent === undefined) {
+      throw new RemoteError(
+        'teamPanel/parent-not-live',
+        `parent session "${request.parentSessionId}" is not live; open the parent conversation before switching this member's model`,
+        { sessionId: request.sessionId, parentSessionId: request.parentSessionId },
+      )
+    }
+    const wakeSelection: { provider: string; model: string; reasoningEffort?: never } = {
+      provider: request.provider,
+      model: request.model,
+    }
+    const applyWakeSelection = (): undefined => {
+      const queued = this.wakeSelections.get(request.sessionId)
+      if (queued === undefined) return undefined
+      this.wakeSelections.delete(request.sessionId)
+      this.ctx.agents.get(request.sessionId as never)?.model.select(queued)
+      return undefined
+    }
+    this.wakeSelections.set(request.sessionId, wakeSelection)
+    const listener = this.ctx.on('agent/created', applyWakeSelection, { global: true })
+    try {
+      const route = `${request.provider}/${request.model}`
+      const notice = `[model changed: the session continues with ${route}]`
+      // The composer's own delivery path: the SubagentRuntime remote validates
+      // the address, requires the live direct parent, cold-resumes the child,
+      // and accepts the notice into its inbox.
+      await this.ctx.subagents.prompt({
+        requestId: randomUUID() as never,
+        parentSessionId: request.parentSessionId as never,
+        childSessionId: request.sessionId as never,
+        mode: 'continuable',
+        delivery: 'queue',
+        content: [{ type: 'text', text: notice }],
+      }, new AbortController().signal)
+      // prompt resolves at inbox acceptance; the agent/created listener has
+      // normally applied the selection already (creation precedes release of
+      // queued work). Poll only for the Agent handle the caller records from.
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const agent = this.ctx.agents.get(request.sessionId as never)
+        if (agent !== undefined) {
+          applyWakeSelection()
+          return agent
+        }
+        await new Promise(resolve => { setTimeout(resolve, 100) })
+      }
+      return this.ctx.agents.get(request.sessionId as never)
+    } finally {
+      listener()
+      this.wakeSelections.delete(request.sessionId)
+    }
   }
 }
 

@@ -108,7 +108,15 @@ export function registerComposerModel(ctx: Context): void {
               pending = selection
               selectionError = null
               sync()
-              const result = await modelRpc<void>('teamPanel/switchModel', { request: { sessionId, ...selection } })
+              // The address carries the parent id, so a cold child is woken
+              // through the composer's own delivery path before the switch.
+              const result = await modelRpc<void>('teamPanel/switchModel', {
+                request: {
+                  sessionId,
+                  ...address.mode === 'continuable' ? { parentSessionId: address.parentSessionId } : {},
+                  ...selection,
+                },
+              })
               pending = null
               if (!result.ok) selectionError = result.error.message
               sync()
