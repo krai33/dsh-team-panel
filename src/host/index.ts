@@ -476,6 +476,26 @@ export class TeamPanelAvatarService extends TypertRemoteService {
   }
 
   /**
+   * Read the staged model routes recorded for cold members, so the roster and
+   * the composer selector can show the route that takes effect at each
+   * member's next conversation instead of the stale durable one.
+   * @returns session id → staged route.
+   */
+  @Remote('stagedSelections')
+  async stagedSelections(): Promise<{ selections: Record<string, { provider: string; model: string; reasoningEffort?: string }> }> {
+    const selections: Record<string, { provider: string; model: string; reasoningEffort?: string }> = {}
+    await this.withStagedSelections(() => {})
+    for (const [id, route] of this.stagedSelectionCache ?? []) {
+      selections[id] = {
+        provider: route.provider,
+        model: route.model,
+        ...route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort },
+      }
+    }
+    return { selections }
+  }
+
+  /**
    * Record one staged route for a cold member and install the standing
    * `agent/created` listener that applies staged selections. The listener runs
    * inside the Agent's serial creation phase — before queued work is released —
@@ -522,7 +542,11 @@ export class TeamPanelAvatarService extends TypertRemoteService {
     const file = join(this.dataDir, 'model-staged.json')
     try {
       if (this.stagedSelectionCache === undefined) {
-        const raw = await readFile(file, 'utf8')
+        // A missing file is an empty map (first use), not an error.
+        const raw = await readFile(file, 'utf8').catch((error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return '{}'
+          throw error
+        })
         const parsed: unknown = JSON.parse(raw)
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
           throw new Error('expected a staged-selection object')

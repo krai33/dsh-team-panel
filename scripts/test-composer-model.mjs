@@ -10,10 +10,22 @@ const mockStore = `function createSnapshotStore(initial) {
  return { getSnapshot: () => state, set: value => { state = value; for(const fn of listeners) fn() },
  subscribe: fn => {listeners.add(fn); return () => listeners.delete(fn)} };
 }`
-const js = ts.transpileModule(source.replace(/import \{ createSnapshotStore \} from '[^']+'/,mockStore), {
+const mockStaged = `const stagedStore = (function(){ let byMember = {}; const listeners = new Set();
+ const publish = () => { for (const fn of listeners) fn() };
+ return { getStagedSnapshot: () => ({ byMember, loaded: true }),
+ markStaged: (id, route) => { byMember = { ...byMember, [id]: route }; publish() },
+ markStagedApplied: id => { const { [id]: d, ...rest } = byMember; byMember = rest; publish() },
+ subscribeStaged: fn => { listeners.add(fn); return () => listeners.delete(fn) },
+ __set: v => { byMember = v; publish() } } })()
+const { getStagedSnapshot, markStaged, markStagedApplied, subscribeStaged } = stagedStore`
+const stripped = source
+  .replace(/import \{ createSnapshotStore \} from '[^']+'/, mockStore)
+  .replace(/import \{ getStagedSnapshot[^']*} from '\.\/staged\.ts'/, mockStaged)
+const js = ts.transpileModule(stripped, {
  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText
-const { registerComposerModel } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)
+const jsWithExports = `${js}\nexport const __staged = stagedStore`
+const { registerComposerModel, __staged } = await import(`data:text/javascript;base64,${Buffer.from(jsWithExports).toString('base64')}`)
 function fixture() {
  let state = {current:{provider:'test',model:'old'},groups:[],failures:[],status:'ready',pending:null,error:null,routable:true}
  const listeners = new Set(), disposers=[]

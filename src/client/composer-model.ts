@@ -7,6 +7,7 @@ import type { PropsLocale, PropsRuntime, PropsRenderSlots } from '@deepseek-ai/d
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { ModelSelection, ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
+import { getStagedSnapshot, markStaged, markStagedApplied, subscribeStaged, type StagedRoute } from './staged.ts'
 
 /** Call a catalog or live-agent endpoint without activating stored Session history. */
 async function modelRpc<T>(method: string, args: object): Promise<RemoteResult<T>> {
@@ -64,10 +65,16 @@ export function registerComposerModel(ctx: Context): void {
           let disposed = false
           let loading = false
           let catalog: ModelCatalog | null = null
+          const stagedNow = (): StagedRoute | undefined => getStagedSnapshot().byMember[sessionId]
           const sync = (): void => {
             if (disposed) return
             const state = native.directory.getSnapshot()
-            const current = state.current ?? catalog?.default ?? null
+            // A staged route supersedes the durable projection for display: it
+            // is the route the member's next conversation actually uses.
+            const staged = stagedNow()
+            const stagedSelection = staged === undefined ? null
+              : { provider: staged.provider, model: staged.model, ...staged.reasoningEffort === undefined ? {} : { reasoningEffort: staged.reasoningEffort as ModelSelection['reasoningEffort'] } }
+            const current = stagedSelection ?? state.current ?? catalog?.default ?? null
             const groups = catalog?.groups ?? state.groups
             directory.set({ ...state, current, groups, failures: catalog?.failures ?? state.failures,
               routable: current === null ? null : groups.some(group => group.id === current.provider
@@ -77,10 +84,12 @@ export function registerComposerModel(ctx: Context): void {
                 : loading ? 'loading' : catalog !== null ? 'ready' : state.status })
           }
           const unsubscribe = native.directory.subscribe(() => { catalog = null; sync() })
+          const unsubscribeStaged = subscribeStaged(sync)
           const cleanup = (): void => {
             if (disposed) return
             disposed = true
             unsubscribe()
+            unsubscribeStaged()
             faces.delete(sessionId)
             cleanups.delete(cleanup)
           }
@@ -110,13 +119,20 @@ export function registerComposerModel(ctx: Context): void {
               sync()
               // A cold member stages its route instead of erroring: the switch
               // records for the member's next conversation, like a native switch.
-              const result = await modelRpc<void>('teamPanel/switchModel', {
+              const result = await modelRpc<{ staged: boolean }>('teamPanel/switchModel', {
                 request: { sessionId, ...selection },
               })
               pending = null
-              if (!result.ok) selectionError = result.error.message
+              if (result.ok) {
+                // Reflect the outcome immediately: a staged route shows as the
+                // member's current route until its next conversation applies it.
+                if (result.value.staged) markStaged(sessionId, selection)
+                else markStagedApplied(sessionId)
+              } else {
+                selectionError = result.error.message
+              }
               sync()
-              return result
+              return result.ok ? { ok: true, value: undefined } : result
             },
           }
           faces.set(sessionId, face)

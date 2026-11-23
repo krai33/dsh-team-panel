@@ -15,6 +15,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { NS, type TeamKey } from './locales.ts'
 import { AvatarSeat } from './AvatarSeat.tsx'
 import { getRemovedSnapshot, loadRemoved, removeMember, subscribeRemoved } from './removed.ts'
+import { getStagedSnapshot, loadStaged, subscribeStaged } from './staged.ts'
 import css from './styles.ts'
 
 /** Business actions injected by the browser plugin. */
@@ -66,6 +67,8 @@ function TeamMemberRow({
   member, memberCount, sessionId, useSessions, useSessionStatus, openTeammate, onError, t,
 }: TeamMemberRowProps) {
   const model = useSessions(state => state.projectionsBySession[member.id]?.values.modelSelection?.next?.model)
+  const staged = useSyncExternalStore(subscribeStaged, getStagedSnapshot).byMember[member.id]
+  const shownModel = staged?.model ?? model
   const running = useSessionStatus(state => state.get(member.id)?.running)
   const summaryRunning = useSessions(state => state.byId[member.id]?.running)
   const status: MemberStatus
@@ -107,8 +110,8 @@ function TeamMemberRow({
               {isCurrent && <Tag tone="info" className={css.currentTag}>{t('current')}</Tag>}
             </span>
             <small className={css.memberStatusLine}>
-              {model !== undefined && (
-                <span className={css.memberModel}>{`${t('model')}: ${model}`}</span>
+              {shownModel !== undefined && (
+                <span className={css.memberModel}>{`${t('model')}: ${shownModel}`}</span>
               )}
             </small>
           </span>
@@ -267,6 +270,8 @@ export function TeamAction({
   const removed = useSyncExternalStore(subscribeRemoved, getRemovedSnapshot, getRemovedSnapshot)
 
   useEffect(() => { if (open) loadRemoved(leadSessionId) }, [open, leadSessionId])
+  // Staged routes are session-independent plugin data; load once per open.
+  useEffect(() => { if (open) loadStaged() }, [open])
 
   const archivedChildren = new Set(removed.byLead[leadSessionId] ?? [])
 

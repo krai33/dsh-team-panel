@@ -2,5 +2,17 @@
   "4a34cf35-22d9-4916-9ef0-70c43d04e491": {
     "provider": "deepseek",
     "model": "deepseek-flash"
+  },
+  "3a653359-c0cb-4989-8a99-745d4646e680": {
+    "provider": "zai",
+    "model": "GLM-5.3"
+  },
+  "48a0737a-2696-405b-8ce9-c6aed6a0f6f2": {
+    "provider": "deepseek",
+    "model": "deepseek-flash"
+  },
+  "9f032609-f5fb-487a-b329-8203b45b05aa": {
+    "provider": "zai",
+    "model": "GLM-5.3"
   }
 }
