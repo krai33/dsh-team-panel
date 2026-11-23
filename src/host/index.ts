@@ -24,7 +24,6 @@ import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { RemoteErrorDetailsMap } from '@deepseek-ai/dsh-typert-protocol'
@@ -41,8 +40,6 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'teamPanel/asset-too-large': { readonly bytes: number; readonly maxBytes: number }
     /** No live Agent holds the named subagent session. */
     'teamPanel/not-live': { readonly sessionId: string }
-    /** The parent session needed to wake a cold member is not live. */
-    'teamPanel/parent-not-live': { readonly sessionId: string; readonly parentSessionId: string }
     /** The requested provider/model route is not resolvable. */
     'teamPanel/route-unavailable': { readonly provider: string; readonly model: string }
   }
@@ -59,6 +56,13 @@ declare module '@deepseek-ai/cordis' {
 
 /** One row of the avatar assignment map (session id → asset file name). */
 export type AvatarMap = Readonly<Record<string, string>>
+
+/** A model route staged for a cold member, applied at its next materialization. */
+interface StagedModelSelection {
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort?: never
+}
 
 /** Response of `list`: assignments plus the available image files. */
 export interface AvatarListValue {
@@ -119,8 +123,10 @@ export class TeamPanelAvatarService extends TypertRemoteService {
   private readonly dataDir: string
   private cache: AvatarMap | undefined
   private avatarOperations: Promise<void> = Promise.resolve()
-  /** One queued route change per waking member, applied inside the child's agent/created listeners. */
-  private readonly wakeSelections = new Map<string, { provider: string; model: string; reasoningEffort?: never }>()
+  /** In-memory mirror of `data/model-staged.json`: routes staged for cold members. */
+  private stagedSelectionCache: Map<string, StagedModelSelection> | undefined
+  /** Standing agent/created listener applying staged selections; installed on first stage. */
+  private stagedSelectionListener: (() => void) | undefined
 
   private withAvatars<T>(run: () => Promise<T>): Promise<T> {
     const result = this.avatarOperations.then(run)
@@ -373,18 +379,21 @@ export class TeamPanelAvatarService extends TypertRemoteService {
   }
 
   /**
-   * Switch one member's model route in place by recording a `model/selection`
-   * event on that member's Session — the same mechanism the
-   * subagent-model-switch plugin exposes as `subagentRoute/switch`.
+   * Switch one member's model route by recording a `model/selection` event on
+   * that member's Session — the same mechanism the subagent-model-switch
+   * plugin exposes as `subagentRoute/switch`.
    *
-   * Works for the lead session and any live/resident child. A cold continuable
-   * child with a live parent (request `parentSessionId`) is first woken through
-   * the same subagent delivery the composer uses — the wake prompt is one
-   * visible `[model changed: …]` notice — because opening a child view never
-   * materializes its Agent. Children without a live parent, and one-shot or
-   * external ids that no delivery can wake, stay refused.
-   * @param request - member session id, the target route, and the direct parent for wake delivery.
-   * @returns the applied selection and the member's previous route.
+   * A live/resident member (including the lead) is selected directly. A cold
+   * member cannot be selected in place — no Agent holds its write path, and
+   * materializing one just to record a route would run a turn — so its
+   * selection is STAGED in plugin storage instead. A standing `agent/created`
+   * listener applies staged selections while the member is still inside its
+   * creation serial phase (before queued work is released), so the member's
+   * next real conversation starts on the staged route. Switching itself adds
+   * no message, notice, or turn, matching the native record-for-next-use
+   * semantics of a model switch.
+   * @param request - member session id and the target route.
+   * @returns the applied or staged selection, and the member's previous route when one is recorded.
    */
   @Remote('switchModel')
   async switchModel(request: {
@@ -392,9 +401,9 @@ export class TeamPanelAvatarService extends TypertRemoteService {
     provider: string
     model: string
     reasoningEffort?: string
-    parentSessionId?: string
   }): Promise<{
     applied: { provider: string; model: string; reasoningEffort?: string }
+    staged: boolean
     lastUsed?: { provider: string; model: string }
   }> {
     if (!nonEmpty(request?.sessionId) || !nonEmpty(request?.provider) || !nonEmpty(request?.model)) {
@@ -404,34 +413,35 @@ export class TeamPanelAvatarService extends TypertRemoteService {
         {},
       )
     }
-    let agent = this.ctx.agents.get(request.sessionId as never)
-    if (agent === undefined && nonEmpty(request.parentSessionId)) {
-      agent = await this.wakeChildForMember({
-        sessionId: request.sessionId,
-        provider: request.provider,
-        model: request.model,
-        ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort },
-        parentSessionId: request.parentSessionId,
-      })
-    }
-    if (agent === undefined) {
-      throw new RemoteError(
-        'teamPanel/not-live',
-        `no live Agent for session "${request.sessionId}"; the member must be running, resident, or woken through its live parent session`,
-        { sessionId: request.sessionId },
-      )
-    }
-    // Preflight the route exactly like session/selectModel does before append.
+    // Preflight the route exactly like session/selectModel does before recording.
     await this.ctx.llm.resolveCallConfig({
       provider: request.provider,
       model: request.model,
       ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort as never },
     })
-    const header = agent.session.requestHeader()?.config
-    agent.model.select({
+    const agent = this.ctx.agents.get(request.sessionId as never)
+    if (agent !== undefined) {
+      const header = agent.session.requestHeader()?.config
+      agent.model.select({
+        provider: request.provider,
+        model: request.model,
+        ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort as never },
+      })
+      return {
+        applied: {
+          provider: request.provider,
+          model: request.model,
+          ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort },
+        },
+        staged: false,
+        ...(header === undefined ? {} : { lastUsed: { provider: header.provider, model: header.model } }),
+      }
+    }
+    await this.stageModelSelection({
+      sessionId: request.sessionId,
       provider: request.provider,
       model: request.model,
-      ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort as never },
+      ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort },
     })
     return {
       applied: {
@@ -439,7 +449,7 @@ export class TeamPanelAvatarService extends TypertRemoteService {
         model: request.model,
         ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort },
       },
-      ...(header === undefined ? {} : { lastUsed: { provider: header.provider, model: header.model } }),
+      staged: true,
     }
   }
 
@@ -466,77 +476,79 @@ export class TeamPanelAvatarService extends TypertRemoteService {
   }
 
   /**
-   * Wake one cold continuable child through the same delivery the composer
-   * uses, so opening a read-only child view is never a prerequisite for a
-   * model switch. The wake prompt is a single visible notice phrased like the
-   * harness' own model-change notice, so the child log stays truthful about
-   * the route change; delivery itself materializes the Agent (cold resume).
-   *
-   * The target route is recorded BEFORE delivery and applied from a global
-   * `agent/created` listener: those listeners run serially before the child's
-   * queued inbox work is released, so the first wake step already prepares on
-   * the new route instead of racing the switch (a lost race replays the dead
-   * route the wake was meant to replace).
-   * @param request - child id, target route, and the live direct parent id.
-   * @returns the materialized child Agent, or undefined when the wake did not publish one.
+   * Record one staged route for a cold member and install the standing
+   * `agent/created` listener that applies staged selections. The listener runs
+   * inside the Agent's serial creation phase — before queued work is released —
+   * so the member's first real conversation after materialization starts on
+   * the staged route; the selection event then persists like any native one.
+   * Staged selections survive plugin reloads through a durable file beside the
+   * avatar assignments.
+   * @param request - the member id and the route to stage.
+   * @returns once the staged selection is durably recorded.
    */
-  private async wakeChildForMember(request: {
+  private async stageModelSelection(request: {
     readonly sessionId: string
     readonly provider: string
     readonly model: string
     readonly reasoningEffort?: string
-    readonly parentSessionId: string
-  }): Promise<Agent | undefined> {
-    const parent = this.ctx.agents.get(request.parentSessionId as never)
-    if (parent === undefined) {
-      throw new RemoteError(
-        'teamPanel/parent-not-live',
-        `parent session "${request.parentSessionId}" is not live; open the parent conversation before switching this member's model`,
-        { sessionId: request.sessionId, parentSessionId: request.parentSessionId },
-      )
-    }
-    const wakeSelection: { provider: string; model: string; reasoningEffort?: never } = {
+  }): Promise<void> {
+    const staged = {
       provider: request.provider,
       model: request.model,
+      ...request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort as never },
     }
-    const applyWakeSelection = (): undefined => {
-      const queued = this.wakeSelections.get(request.sessionId)
-      if (queued === undefined) return undefined
-      this.wakeSelections.delete(request.sessionId)
-      this.ctx.agents.get(request.sessionId as never)?.model.select(queued)
+    await this.withStagedSelections(store => { store.set(request.sessionId, staged) })
+    this.installStagedSelectionListener()
+  }
+
+  /** Apply and retire staged selections when their member materializes. */
+  private installStagedSelectionListener(): void {
+    if (this.stagedSelectionListener !== undefined) return
+    this.stagedSelectionListener = this.ctx.on('agent/created', ({ agent }) => {
+      const selection = this.stagedSelectionCache?.get(agent.id)
+      if (selection === undefined) return undefined
+      agent.model.select(selection)
+      void this.withStagedSelections(store => { store.delete(agent.id) })
       return undefined
-    }
-    this.wakeSelections.set(request.sessionId, wakeSelection)
-    const listener = this.ctx.on('agent/created', applyWakeSelection, { global: true })
+    }, { global: true })
+    this.ctx.effect(() => () => {
+      this.stagedSelectionListener?.()
+      this.stagedSelectionListener = undefined
+    }, 'team-panel: staged selection listener')
+  }
+
+  /** Read, mutate, and atomically persist the staged-selection map. */
+  private async withStagedSelections(mutate: (store: Map<string, StagedModelSelection>) => void): Promise<void> {
+    const file = join(this.dataDir, 'model-staged.json')
     try {
-      const route = `${request.provider}/${request.model}`
-      const notice = `[model changed: the session continues with ${route}]`
-      // The composer's own delivery path: the SubagentRuntime remote validates
-      // the address, requires the live direct parent, cold-resumes the child,
-      // and accepts the notice into its inbox.
-      await this.ctx.subagents.prompt({
-        requestId: randomUUID() as never,
-        parentSessionId: request.parentSessionId as never,
-        childSessionId: request.sessionId as never,
-        mode: 'continuable',
-        delivery: 'queue',
-        content: [{ type: 'text', text: notice }],
-      }, new AbortController().signal)
-      // prompt resolves at inbox acceptance; the agent/created listener has
-      // normally applied the selection already (creation precedes release of
-      // queued work). Poll only for the Agent handle the caller records from.
-      for (let attempt = 0; attempt < 50; attempt++) {
-        const agent = this.ctx.agents.get(request.sessionId as never)
-        if (agent !== undefined) {
-          applyWakeSelection()
-          return agent
+      if (this.stagedSelectionCache === undefined) {
+        const raw = await readFile(file, 'utf8')
+        const parsed: unknown = JSON.parse(raw)
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          throw new Error('expected a staged-selection object')
         }
-        await new Promise(resolve => { setTimeout(resolve, 100) })
+        const store = new Map<string, StagedModelSelection>()
+        for (const [id, value] of Object.entries(parsed)) {
+          if (typeof value !== 'object' || value === null) throw new Error('expected staged-selection records')
+          const { provider, model, reasoningEffort } = value as Record<string, unknown>
+          if (typeof provider !== 'string' || typeof model !== 'string'
+            || (reasoningEffort !== undefined && typeof reasoningEffort !== 'string')) {
+            throw new Error('expected staged-selection route fields')
+          }
+          store.set(id, {
+            provider,
+            model,
+            ...reasoningEffort === undefined ? {} : { reasoningEffort: reasoningEffort as never },
+          })
+        }
+        this.stagedSelectionCache = store
       }
-      return this.ctx.agents.get(request.sessionId as never)
-    } finally {
-      listener()
-      this.wakeSelections.delete(request.sessionId)
+      mutate(this.stagedSelectionCache)
+      await mkdir(this.dataDir, { recursive: true })
+      await writeFile(file, `${JSON.stringify(Object.fromEntries(this.stagedSelectionCache), null, 2)}\n`)
+    } catch (error) {
+      this.stagedSelectionCache = undefined
+      throw storageError('recording the staged model selection', error)
     }
   }
 }

@@ -50,7 +50,7 @@ test('selection targets child only, tracks pending and follows durable projectio
  t.mock.method(globalThis,'fetch',async(_url,options)=>{sent=JSON.parse(options.body);return await new Promise(resolve=>{complete=resolve})})
  const selection={provider:'test',model:'new',reasoningEffort:'high'}
  const pending=child.select(selection)
- assert.deepEqual(sent.payload.args.request,{sessionId:'child',parentSessionId:'root',...selection})
+ assert.deepEqual(sent.payload.args.request,{sessionId:'child',...selection})
  assert.deepEqual(child.directory.getSnapshot().pending,selection)
  assert.equal(await child.select(selection),undefined)
  f.update({current:selection})
