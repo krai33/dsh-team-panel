@@ -17,7 +17,7 @@ DeepSeek Harness Web 客户端插件：把官方 experimental Agent Teams 的会
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:<你的用户名>/dsh-team-panel
+dsh plugin --profile web add github:krai33/dsh-team-panel
 ```
 
 或从本地源码目录安装（`dsh.plugin add <path>` 会同时应用本包自带的 `cordis.patch.yml`；`dsh plugin add` 只写依赖，不写 patch 行），再手工在 `~/.dsh/profiles/web/cordis.patch.yml` 顶部插入：
