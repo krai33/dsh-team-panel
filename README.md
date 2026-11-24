@@ -42,11 +42,10 @@ dsh plugin --profile web add github:krai33/dsh-team-panel
 dsh plugin --profile web remove dsh-subagent-model-switch
 ```
 
-若 pnpm 启用了 `blockExoticSubdeps` 并拒绝 git 子依赖，先直接安装伴生包再装本包：
+若 `dsh plugin add` 报 `ERR_PNPM_EXOTIC_SUBDEP`（新版 pnpm 默认 `blockExoticSubdeps` 拒绝 git 子依赖），在 profile 的 `pnpm-workspace.yaml` 中加入一行后重试：
 
-```sh
-dsh plugin --profile web add github:krai33/dsh-subagent-model-switch
-dsh plugin --profile web add github:krai33/dsh-team-panel
+```yaml
+blockExoticSubdeps: false
 ```
 
 ## 添加成员与递归深度
