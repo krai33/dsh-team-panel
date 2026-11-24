@@ -2,6 +2,12 @@
 
 DeepSeek Harness Web 客户端插件：把官方 experimental Agent Teams 的会话头部下拉面板移植为独立插件，数据改用 stock 投影，不依赖官方 team host 服务与 `spawn_teammate` 工具链。
 
+## 效果展示
+
+![dsh-team-panel 成员花名册与模型信息](data/team-panel-preview.jpg)
+
+面板在会话头部展示成员花名册、当前模型和运行状态；成员卡片支持打开子会话，并可在支持的会话上切换模型。
+
 ## 功能
 
 - **成员花名册**：入口挂在会话头部（`conversation.session.header.actions`），悬停/点击展开。首行是主会话（lead），其后是 `subagentCatalog` 投影里的本地子代理（continuable/one-shot；external 不显示）。

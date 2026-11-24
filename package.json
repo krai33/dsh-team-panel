@@ -26,7 +26,8 @@
     "cordis.patch.yml",
     "README.md",
     "data/assets/.gitkeep",
-    "data/assets/*"
+    "data/assets/*",
+    "data/team-panel-preview.jpg"
   ],
   "scripts": {
     "build": "node node_modules-sibling/typescript/bin/tsc -p tsconfig.json && node scripts/typecheck-client.mjs && node node_modules-sibling/.bin/tsdown -c tsdown.client.config.ts",
