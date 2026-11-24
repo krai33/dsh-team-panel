@@ -5,3 +5,4 @@ data/model-staged.json
 data/avatars.json
 data/assets/*
 !data/assets/.gitkeep
+node_modules-sibling/*
