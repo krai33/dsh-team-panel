@@ -42,6 +42,13 @@ dsh plugin --profile web add github:krai33/dsh-team-panel
 dsh plugin --profile web remove dsh-subagent-model-switch
 ```
 
+若 pnpm 启用了 `blockExoticSubdeps` 并拒绝 git 子依赖，先直接安装伴生包再装本包：
+
+```sh
+dsh plugin --profile web add github:krai33/dsh-subagent-model-switch
+dsh plugin --profile web add github:krai33/dsh-team-panel
+```
+
 ## 添加成员与递归深度
 
 成员区标题行的 **+** 按钮不经模型直接创建成员：填写初始任务（必填）、成员名称（可选，缺省取任务首行）并选择递归深度 1/2/3（默认 1）。初始任务像普通委派一样执行，结果回到父会话，成员保留为可持续对话的子代理。

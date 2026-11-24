@@ -1,5 +1,4 @@
 node_modules/
-lib/
 *.tsbuildinfo
 data/model-staged.json
 data/avatars.json
