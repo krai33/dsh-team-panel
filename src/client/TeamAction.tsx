@@ -5,7 +5,7 @@ import type { SubagentCatalogEntry } from '@deepseek-ai/dsh-subagent/types'
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  IconChevronDownOutlineRegular, IconCloseOutlineRegular,
+  IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconPlusOutlineRegular,
   IconUserOutlineRegular, IconUsersOutlineRegular, StateDot, Tag, Tooltip,
   useAnchoredPosition, useDismissOnOutsidePointer, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -14,6 +14,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { NS, type TeamKey } from './locales.ts'
 import { AvatarSeat } from './AvatarSeat.tsx'
+import { addMember } from './add-member.ts'
 import { getRemovedSnapshot, loadRemoved, removeMember, subscribeRemoved } from './removed.ts'
 import { getStagedSnapshot, loadStaged, subscribeStaged } from './staged.ts'
 import css from './styles.ts'
@@ -198,6 +199,140 @@ function TeamChildRow(props: TeamMemberRowProps & { onRemoved: (message: string)
         document.body,
       )}
     </div>
+  )
+}
+
+/** Roster-header control that creates a member under the lead with a chosen delegation depth. */
+function AddMemberSeat({ leadSessionId, t }: { leadSessionId: SessionId; t: TranslateNS<typeof NS> }) {
+  const [open, setOpen] = useState(false)
+  const [prompt, setPrompt] = useState('')
+  const [label, setLabel] = useState('')
+  const [depth, setDepth] = useState(1)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const promptRef = useRef<HTMLTextAreaElement>(null)
+  const position = useAnchoredPosition({ open, anchorRef, panelRef, gap: 6, margin: 12 })
+
+  useDismissOnOutsidePointer(anchorRef, open, setOpen, panelRef)
+
+  useEffect(() => {
+    if (!open) return
+    promptRef.current?.focus()
+    const dismiss = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setOpen(false)
+    }
+    document.addEventListener('keydown', dismiss)
+    return () => { document.removeEventListener('keydown', dismiss) }
+  }, [open])
+
+  const submit = (): void => {
+    if (pending || prompt.trim() === '') return
+    setPending(true)
+    setError(null)
+    void addMember({
+      sessionId: leadSessionId,
+      prompt: prompt.trim(),
+      ...label.trim() === '' ? {} : { label: label.trim() },
+      depth,
+    })
+      .then(() => {
+        setPrompt('')
+        setLabel('')
+        setDepth(1)
+        setOpen(false)
+      })
+      .catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      })
+      .finally(() => { setPending(false) })
+  }
+
+  return (
+    <span ref={anchorRef} className={css.addSeat}>
+      <button
+        type="button"
+        className={css.addTrigger}
+        aria-label={t('add.aria')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => { setError(null); setOpen(current => !current) }}
+      >
+        <IconPlusOutlineRegular size={12} />
+      </button>
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className={css.addCard}
+          style={position ?? { visibility: 'hidden', left: 0, top: 0 }}
+          role="dialog"
+          aria-label={t('add.title')}
+          onPointerDown={(event) => { event.stopPropagation() }}
+          onClick={(event) => { event.stopPropagation() }}
+        >
+          <div className={css.confirmTitle}>{t('add.title')}</div>
+          <label className={css.addField}>
+            <span>{t('add.prompt')}</span>
+            <textarea
+              ref={promptRef}
+              className={css.addTextarea}
+              value={prompt}
+              placeholder={t('add.promptPlaceholder')}
+              onChange={(event) => { setPrompt(event.target.value) }}
+            />
+          </label>
+          <label className={css.addField}>
+            <span>{t('add.label')}</span>
+            <input
+              type="text"
+              className={css.addInput}
+              value={label}
+              onChange={(event) => { setLabel(event.target.value) }}
+            />
+          </label>
+          <fieldset className={css.addField}>
+            <legend>{t('add.depth')}</legend>
+            <div className={css.addDepthRow}>
+              {[1, 2, 3].map(tier => (
+                <label key={tier} className={css.addDepthOption}>
+                  <input
+                    type="radio"
+                    name="team-panel-add-depth"
+                    checked={depth === tier}
+                    onChange={() => { setDepth(tier) }}
+                  />
+                  <span>{String(tier)}</span>
+                </label>
+              ))}
+            </div>
+            <small className={css.addHint}>{t('add.depthHint')}</small>
+          </fieldset>
+          {error !== null && <div className={css.confirmError} role="alert">{error}</div>}
+          <div className={css.confirmActions}>
+            <button
+              type="button"
+              className={css.confirmCancel}
+              disabled={pending}
+              onClick={() => { setOpen(false) }}
+            >
+              {t('add.cancel')}
+            </button>
+            <button
+              type="button"
+              className={css.addSubmit}
+              disabled={pending || prompt.trim() === ''}
+              onClick={submit}
+            >
+              {pending ? t('add.pending') : t('add.submit')}
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </span>
   )
 }
 
@@ -402,6 +537,7 @@ export function TeamAction({
               <h3>
                 {t('roster')}
                 {members.length > 1 && <span className={css.count}>{members.length}</span>}
+                <AddMemberSeat leadSessionId={leadSessionId} t={t} />
               </h3>
               <div className={css.roster}>
                 <TeamMemberRow

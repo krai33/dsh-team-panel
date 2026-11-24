@@ -42,6 +42,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'teamPanel/not-live': { readonly sessionId: string }
     /** The requested provider/model route is not resolvable. */
     'teamPanel/route-unavailable': { readonly provider: string; readonly model: string }
+    /** The selected depth has no preset configured in `depthPresets`. */
+    'teamPanel/depth-unconfigured': { readonly depth: number }
   }
 }
 
@@ -121,6 +123,8 @@ export class TeamPanelAvatarService extends TypertRemoteService {
   static inject = ['typertGateway', 'agents', 'llm', 'workspaceRegistry', 'subagents']
 
   private readonly dataDir: string
+  private readonly spawnProvider: string
+  private readonly depthPresets: Readonly<Record<string, string>>
   private cache: AvatarMap | undefined
   private avatarOperations: Promise<void> = Promise.resolve()
   /** In-memory mirror of `data/model-staged.json`: routes staged for cold members. */
@@ -134,13 +138,27 @@ export class TeamPanelAvatarService extends TypertRemoteService {
     return result
   }
 
-  constructor(ctx: Context, config: { dataDir?: string } = {}) {
+  constructor(ctx: Context, config: {
+    dataDir?: string
+    /** Subagent provider that materializes members; default `spawn`. */
+    spawnProvider?: string
+    /**
+     * Delegation-depth tiers for `addMember`, keyed by the depth the dialog
+     * offers: each value is the Agent Preset the member is created under.
+     * Depth `1` with no entry creates the member under the parent's current
+     * preset (today's no-delegation default); any other unmapped depth is
+     * refused with `teamPanel/depth-unconfigured`.
+     */
+    depthPresets?: Record<string, string>
+  } = {}) {
     super(ctx, 'teamPanel', { namespace: 'teamPanel' })
     // Default data dir: the installed plugin package root's `data/`. This
     // module is the package's host entry at lib/host/index.js, so the
     // package.json sits two directories up.
     const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
     this.dataDir = nonEmpty(config?.dataDir) ? config.dataDir : join(pkgRoot, 'data')
+    this.spawnProvider = nonEmpty(config?.spawnProvider) ? config.spawnProvider : 'spawn'
+    this.depthPresets = Object.freeze({ ...(config?.depthPresets ?? {}) })
   }
 
   /**
@@ -451,6 +469,74 @@ export class TeamPanelAvatarService extends TypertRemoteService {
       },
       staged: true,
     }
+  }
+
+  /**
+   * Create a roster member under the lead session — the human-authorized
+   * counterpart of the model's `subagent` tool. The selected depth tier maps
+   * to an Agent Preset through the `depthPresets` config, so the member's own
+   * delegation budget is the `maxDepth` that preset gives its `tool-subagent`
+   * instance. The initial task runs like a normal delegation: its result is
+   * delivered to the parent session, and the member stays live and continuable.
+   * @param request - lead session id, initial task, optional label, and the
+   *   depth tier (default 1).
+   * @param signal - cancels creation before publication; absent, the member is
+   *   created even if the caller goes away.
+   * @returns the created member's session id.
+   */
+  @Remote('addMember')
+  async addMember(request: {
+    sessionId: string
+    prompt: string
+    label?: string
+    depth?: number
+  }, signal?: AbortSignal): Promise<{ childId: string }> {
+    if (!nonEmpty(request?.sessionId) || !nonEmpty(request?.prompt)) {
+      throw new RemoteError(
+        'teamPanel/invalid-request',
+        'addMember requires sessionId and prompt as non-empty strings',
+        {},
+      )
+    }
+    const depth = request.depth ?? 1
+    if (!Number.isSafeInteger(depth) || depth < 1) {
+      throw new RemoteError(
+        'teamPanel/invalid-request',
+        'addMember depth must be a positive safe integer',
+        {},
+      )
+    }
+    const preset = this.depthPresets[String(depth)]
+    if (preset === undefined && depth !== 1) {
+      throw new RemoteError(
+        'teamPanel/depth-unconfigured',
+        `depth ${String(depth)} has no preset configured in depthPresets`,
+        { depth },
+      )
+    }
+    const parent = this.ctx.agents.get(request.sessionId as never)
+    if (parent === undefined) {
+      throw new RemoteError(
+        'teamPanel/not-live',
+        `no live Agent for session "${request.sessionId}" to add the member under`,
+        { sessionId: request.sessionId },
+      )
+    }
+    const label = nonEmpty(request.label)
+      ? request.label
+      : request.prompt.split('\n', 1)[0].slice(0, 60)
+    const started = await this.ctx.subagents.startActivation({
+      provider: this.spawnProvider,
+      label,
+      request: {
+        prompt: [{ type: 'text', text: request.prompt }],
+        parent,
+        ...preset === undefined ? {} : { agentPreset: preset },
+      },
+      signal: signal ?? new AbortController().signal,
+      delivery: 'parent',
+    })
+    return { childId: started.childId }
   }
 
   /**

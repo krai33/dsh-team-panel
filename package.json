@@ -32,7 +32,7 @@
   "scripts": {
     "build": "node node_modules-sibling/typescript/bin/tsc -p tsconfig.json && node scripts/typecheck-client.mjs && node node_modules-sibling/.bin/tsdown -c tsdown.client.config.ts",
     "typecheck": "node scripts/typecheck-client.mjs",
-    "test": "node --test scripts/test-composer-model.mjs scripts/test-avatar-delete.mjs"
+    "test": "node --test scripts/test-composer-model.mjs scripts/test-avatar-delete.mjs scripts/test-add-member.mjs"
   },
   "bin": {},
   "dsh": {

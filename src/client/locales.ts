@@ -46,6 +46,16 @@ export const zh = {
   'remove.confirm': '停止并移除',
   'remove.cancel': '取消',
   'remove.pending': '正在移除…',
+  'add.aria': '添加成员',
+  'add.title': '添加成员',
+  'add.prompt': '任务内容',
+  'add.promptPlaceholder': '新成员启动后执行的第一项任务',
+  'add.label': '成员名称（可选）',
+  'add.depth': '递归深度',
+  'add.depthHint': '子树最深层级：1 = 不可再委派，2 = 可再委派一层，以此类推',
+  'add.submit': '添加',
+  'add.cancel': '取消',
+  'add.pending': '正在创建…',
 } satisfies Record<string, string>
 
 /** Team panel locale key union. */
@@ -94,4 +104,14 @@ export const en = {
   'remove.confirm': 'Stop and remove',
   'remove.cancel': 'Cancel',
   'remove.pending': 'Removing…',
+  'add.aria': 'Add member',
+  'add.title': 'Add member',
+  'add.prompt': 'Initial task',
+  'add.promptPlaceholder': 'The first task the new member works on',
+  'add.label': 'Display name (optional)',
+  'add.depth': 'Delegation depth',
+  'add.depthHint': 'Deepest subtree level: 1 = no further delegation, 2 = one child level, and so on',
+  'add.submit': 'Add',
+  'add.cancel': 'Cancel',
+  'add.pending': 'Creating…',
 } satisfies Record<TeamKey, string>

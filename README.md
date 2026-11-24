@@ -11,6 +11,7 @@ DeepSeek Harness Web 客户端插件：把官方 experimental Agent Teams 的会
 ## 功能
 
 - **成员花名册**：入口挂在会话头部（`conversation.session.header.actions`），悬停/点击展开。首行是主会话（lead），其后是 `subagentCatalog` 投影里的本地子代理（continuable/one-shot；external 不显示）。
+- **添加成员**：成员区标题行的 + 按钮弹出创建面板——填写初始任务、可选成员名称，并选择递归深度 1/2/3（默认 1）。深度经 `depthPresets` 映射到 Agent Preset，见[添加成员与递归深度](#添加成员与递归深度)。
 - **动态模型显示**：每个成员卡片常驻显示当前使用的模型（`modelSelection.next.model`，即 pending ?? lastUsed），不是悬停才出现。
 - **状态**：运行中 / 未运行 / 准备中（unknown 模式子代理），叠加实时 running 状态。运行/准备中以头像角落呼吸绿点表达，文字状态（悬停头像可见）不再占用卡片正文；卡片第二行只显示当前模型。
 - **打开成员会话**：点击成员卡片跳转（当前会话与不可跳转的成员置灰）。
@@ -40,6 +41,44 @@ dsh plugin --profile web add github:krai33/dsh-team-panel
 ```sh
 dsh plugin --profile web remove dsh-subagent-model-switch
 ```
+
+## 添加成员与递归深度
+
+成员区标题行的 **+** 按钮不经模型直接创建成员：填写初始任务（必填）、成员名称（可选，缺省取任务首行）并选择递归深度 1/2/3（默认 1）。初始任务像普通委派一样执行，结果回到父会话，成员保留为可持续对话的子代理。
+
+深度决定成员自己还能再委派几层，映射到插件配置 `depthPresets` 指定的 Agent Preset——preset 里的 `tool-subagent` / `tool-subagent-fork` 的 `maxDepth` 就是成员的递归预算：
+
+- **深度 1（默认）**：不可再委派。不配置时沿用父会话的 preset，与模型用 `subagent` 工具生成的成员完全一致。
+- **深度 2 / 3**：成员自己可以再委派 1 / 2 层子代理（需声明对应 preset）。
+
+```yaml
+# ~/.dsh/profiles/web/cordis.patch.yml
+- id: team-panel
+  name: dsh-team-panel
+  config:
+    spawnProvider: spawn            # 可选，默认 spawn
+    depthPresets:
+      '2': cordis-deep-2
+      '3': cordis-deep-3
+
+# 每个深度一份 preset：现有 preset 清单的完整副本，
+# 只改两个委派工具的 maxDepth（不声明第二个 preset 时深度 2/3 会被拒绝）。
+- id: preset-cordis-deep-2
+  name: '@deepseek-ai/dsh-agent-preset'
+  config:
+    id: cordis-deep-2
+    order: 5
+    plugins:
+      # …与你的主 preset（如 preset-cordis）相同的清单…
+      - id: tool-subagent
+        name: '@deepseek-ai/dsh-tool-subagent'
+        config: { provider: spawn, toolName: subagent, maxDepth: 2 }
+      - id: tool-subagent-fork
+        name: '@deepseek-ai/dsh-tool-subagent'
+        config: { provider: fork, toolName: subagent_fork, maxDepth: 2 }
+```
+
+深度 2/3 未配置 preset 时，创建请求以 `teamPanel/depth-unconfigured` 拒绝，不会生成成员。改动 preset 后重启 DSH，新声明只影响之后创建的成员。
 
 ## 构建
 

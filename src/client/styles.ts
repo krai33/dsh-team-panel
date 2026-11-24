@@ -94,6 +94,21 @@ const stylesheet = `.tp-root{position:relative}
 .tp-confirmCancel{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}
 .tp-confirmGo{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-bg-inverted,#fff)}
 .tp-confirmCancel:disabled,.tp-confirmGo:disabled{opacity:.6;cursor:default}
+.tp-addSeat{margin-left:auto;display:inline-flex}
+.tp-addTrigger{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer}
+.tp-addTrigger:focus-visible{outline:2px solid var(--dsw-alias-border-l3);outline-offset:1px}
+@media (hover:hover){.tp-addTrigger:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}}
+.tp-addCard{display:flex;flex-direction:column;gap:10px;box-sizing:border-box;width:min(320px,100vw - 24px);padding:14px;border-radius:10px;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter);position:fixed;z-index:120}
+.tp-addField{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;border:0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.tp-addField legend{padding:0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.tp-addTextarea{box-sizing:border-box;width:100%;min-height:56px;resize:vertical;padding:6px 8px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px;line-height:18px}
+.tp-addInput{box-sizing:border-box;width:100%;padding:5px 8px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px}
+.tp-addTextarea:focus-visible,.tp-addInput:focus-visible{outline:2px solid var(--dsw-alias-border-l3)}
+.tp-addDepthRow{display:flex;gap:12px}
+.tp-addDepthOption{display:inline-flex;align-items:center;gap:4px;color:var(--dsw-alias-label-primary);font-size:12px;cursor:pointer}
+.tp-addHint{color:var(--dsw-alias-label-tertiary);font-size:11px}
+.tp-addSubmit{padding:5px 12px;border:0;border-radius:6px;background:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-bg-inverted,#fff);font-size:12px;cursor:pointer}
+.tp-addSubmit:disabled{opacity:.6;cursor:default}
 .tp-removedSection{margin-top:12px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l2)}
 .tp-removedRow{display:flex;align-items:center;gap:8px;min-width:0;padding:2px 0}
 .tp-removedLabel{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dsw-alias-label-secondary);font-size:12px}
@@ -163,6 +178,16 @@ const classNames = {
   confirmActions: 'tp-confirmActions',
   confirmCancel: 'tp-confirmCancel',
   confirmGo: 'tp-confirmGo',
+  addSeat: 'tp-addSeat',
+  addTrigger: 'tp-addTrigger',
+  addCard: 'tp-addCard',
+  addField: 'tp-addField',
+  addTextarea: 'tp-addTextarea',
+  addInput: 'tp-addInput',
+  addDepthRow: 'tp-addDepthRow',
+  addDepthOption: 'tp-addDepthOption',
+  addHint: 'tp-addHint',
+  addSubmit: 'tp-addSubmit',
   removedSection: 'tp-removedSection',
   removedRow: 'tp-removedRow',
   removedLabel: 'tp-removedLabel',
