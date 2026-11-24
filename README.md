@@ -29,6 +29,12 @@ dsh plugin --profile web add github:krai33/dsh-team-panel
 
 重启 `dsh --profile web` 生效。
 
+安装会同时带入 [dsh-subagent-model-switch](https://github.com/krai33/dsh-subagent-model-switch)（作为 npm 依赖自动安装并激活，提供 `subagentRoute/switch` CLI，用于对运行中的子代理会话原位切换模型路由）。两者独立工作：面板的核心功能不依赖它。不需要时可在 设置 → 插件 中单独停用，或直接移除：
+
+```sh
+dsh plugin --profile web remove dsh-subagent-model-switch
+```
+
 ## 构建
 
 ```sh

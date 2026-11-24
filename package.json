@@ -61,5 +61,8 @@
     "type": "git",
     "url": "git+https://github.com/krai33/dsh-team-panel.git"
   },
-  "author": "xiwa"
+  "author": "xiwa",
+  "dependencies": {
+    "dsh-subagent-model-switch": "github:krai33/dsh-subagent-model-switch"
+  }
 }
